@@ -9,17 +9,15 @@ from math import pi
 from collections import Counter
 from itertools import combinations
 
-# Carrega os dados
+# --- CARREGAMENTO E PREPARAÇÃO DOS DADOS ---
 df = pd.read_excel('Chapiuski Dados.xlsx')
 df['Data'] = pd.to_datetime(df['Data'])
 df['Semana'] = df['Data'].dt.isocalendar().week
 df['Jogador'] = df['Jogador'].str.strip()
 
 # --- PÁGINA INICIAL COM DESTAQUES ---
-
 st.title('Painel Chapiuski - Dados do Campeonato')
 
-# Destaques gerais
 total_jogos = df['Semana'].nunique()
 total_gols = int(df['Gol'].sum())
 total_assist = int(df['Assistência'].sum())
@@ -50,8 +48,7 @@ st.markdown("""
 ---
 """)
 
-# Filtros interativos
-# Ordena jogadores do mais frequente para o menos frequente
+# --- FILTROS INTUITIVOS ---
 freq_jogadores = df['Jogador'].value_counts().index.tolist()
 jogadores = st.multiselect('Selecione Jogador(es):', freq_jogadores, default=freq_jogadores[:3])
 datas = sorted(df['Data'].dt.date.unique())
@@ -70,10 +67,9 @@ df_filt = df[
 
 st.write('Dados filtrados:', df_filt)
 
-# Gráfico de gols acumulados por semana
+# --- LINHA DO TEMPO: GOLS E ASSISTÊNCIAS ACUMULADAS ---
 if not df_filt.empty:
     st.subheader('Gols Acumulados por Semana')
-    # Cria MultiIndex com todas as combinações de semana e jogador selecionado
     semanas = sorted(df_filt['Semana'].unique())
     idx = pd.MultiIndex.from_product([semanas, jogadores], names=['Semana', 'Jogador'])
     gols_semana = (
@@ -103,7 +99,6 @@ else:
 st.markdown("## 🆚 Comparação Direta (Radar)")
 st.markdown("Compare dois jogadores em gols, assistências, frequência e vitórias. O valor máximo de cada scout é o pico do radar.")
 
-# Seleção dos jogadores para comparação
 jogadores_disp = df['Jogador'].value_counts().index.tolist()
 jogador1 = st.selectbox('Jogador 1', jogadores_disp, index=0)
 jogador2 = st.selectbox('Jogador 2', jogadores_disp, index=1)
@@ -124,20 +119,16 @@ def stats_jogador(jogador, df_filt):
         'Vit/Jogo': vitorias / jogos if jogos > 0 else 0
     }
 
-# Use o dataframe filtrado por data!
 stats_all = [stats_jogador(j, df_filt) for j in jogadores_disp]
 max_stats = {k: max([s[k] for s in stats_all]) if stats_all else 1 for k in stats_all[0].keys()}
 
-# Dados dos jogadores selecionados
 stats1 = stats_jogador(jogador1, df_filt)
 stats2 = stats_jogador(jogador2, df_filt)
 
-# Normaliza para o radar (pico = melhor do campeonato)
 labels = list(stats1.keys())
 values1 = [stats1[k]/max_stats[k] if max_stats[k] > 0 else 0 for k in labels]
 values2 = [stats2[k]/max_stats[k] if max_stats[k] > 0 else 0 for k in labels]
 
-# Radar plot
 angles = [n / float(len(labels)) * 2 * pi for n in range(len(labels))]
 values1 += values1[:1]
 values2 += values2[:1]
@@ -156,10 +147,8 @@ ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
 st.pyplot(fig)
 
 # --- HEATMAP DE PARTICIPAÇÃO POR SEMANA ---
-
 if not df_filt.empty:
     st.subheader('Heatmap de Participação dos Jogadores por Semana')
-    # Garante que todos os jogadores e semanas do filtro estejam no heatmap
     semanas = sorted(df_filt['Semana'].unique())
     idx = pd.MultiIndex.from_product([jogadores, semanas], names=['Jogador', 'Semana'])
     participacao = (
@@ -199,7 +188,6 @@ def plot_rede(media_dict, scout_nome, color, width_factor=1.0):
     ax.axis('off')
     st.pyplot(fig)
 
-# Calcula médias por dupla no filtro atual
 def media_por_dupla(df_filt, scout):
     soma = Counter()
     semanas = Counter()
@@ -212,7 +200,7 @@ def media_por_dupla(df_filt, scout):
 
 media_gols = media_por_dupla(df_filt, 'Gol')
 media_assist = media_por_dupla(df_filt, 'Assistência')
-# Vitórias: conta 1 se ambos venceram na semana
+
 def media_vitorias_dupla(df_filt):
     soma = Counter()
     semanas = Counter()
@@ -262,14 +250,12 @@ st.pyplot(fig)
 st.markdown("## 🚨 Detecção de Outliers")
 st.markdown("Jogadores que destoam do grupo em gols e assistências (acima do limite superior do IQR).")
 
-# Gols
 gols_total = df_filt.groupby('Jogador')['Gol'].sum()
 q1, q3 = gols_total.quantile([0.25, 0.75])
 iqr = q3 - q1
 limite_sup = q3 + 1.5 * iqr
 outliers_gol = gols_total[gols_total > limite_sup]
 
-# Assistências
 assist_total = df_filt.groupby('Jogador')['Assistência'].sum()
 q1a, q3a = assist_total.quantile([0.25, 0.75])
 iqra = q3a - q1a
@@ -278,3 +264,15 @@ outliers_assist = assist_total[assist_total > limite_supa]
 
 st.markdown(f"**Outliers em gols:** {', '.join(outliers_gol.index)}")
 st.markdown(f"**Outliers em assistências:** {', '.join(outliers_assist.index)}")
+
+# --- EXPLICAÇÕES E INSIGHTS ---
+st.markdown("""
+---
+#### ℹ️ **Como usar este painel**
+- Use os filtros para analisar períodos, jogadores ou grupos específicos.
+- Compare desempenhos individuais e coletivos.
+- Explore as redes para entender o entrosamento do elenco.
+- Use a análise de substituição para avaliar o impacto de cada atleta.
+- Fique atento aos outliers: eles podem indicar destaques ou oportunidades de melhoria!
+---
+""")
