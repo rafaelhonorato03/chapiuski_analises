@@ -3,8 +3,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import networkx as nx
 
 from math import pi
+from collections import Counter
+from itertools import combinations
 
 # Carrega os dados
 df = pd.read_excel('Chapiuski Dados.xlsx')
@@ -97,7 +100,8 @@ else:
     st.warning('Nenhum dado para os filtros selecionados.')
 
 # --- COMPARAÇÃO DE JOGADORES (RADAR) ---
-st.header('Comparação de Jogadores')
+st.markdown("## 🆚 Comparação Direta (Radar)")
+st.markdown("Compare dois jogadores em gols, assistências, frequência e vitórias. O valor máximo de cada scout é o pico do radar.")
 
 # Seleção dos jogadores para comparação
 jogadores_disp = df['Jogador'].value_counts().index.tolist()
@@ -168,3 +172,109 @@ if not df_filt.empty:
     ax.set_xlabel('Semana')
     ax.set_ylabel('Jogador')
     st.pyplot(fig)
+
+# --- REDES DE ENTROSAMENTO ---
+st.markdown("## 🔗 Redes de Entrosamento")
+st.markdown("Visualize as duplas mais conectadas em gols, assistências e vitórias. As arestas mais grossas indicam maior entrosamento.")
+
+def plot_rede(media_dict, scout_nome, color, width_factor=1.0):
+    G = nx.Graph()
+    for (j1, j2), val in media_dict.items():
+        if val > 0 and j1 in jogadores and j2 in jogadores:
+            G.add_edge(j1, j2, weight=val)
+    if len(G.edges) == 0:
+        st.info(f"Nenhuma dupla com {scout_nome} no período/seleção atual.")
+        return
+    pos = nx.spring_layout(G, seed=42)
+    edges = G.edges(data=True)
+    weights = [d['weight']*width_factor for (u, v, d) in edges]
+    fig, ax = plt.subplots(figsize=(8, 6))
+    nx.draw_networkx_nodes(G, pos, node_color=color, node_size=700, ax=ax)
+    nx.draw_networkx_edges(G, pos, width=weights, alpha=0.7, ax=ax)
+    nx.draw_networkx_labels(G, pos, font_size=10, font_weight='bold', ax=ax)
+    top_duplas = sorted(edges, key=lambda x: x[2]['weight'], reverse=True)[:5]
+    for u, v, d in top_duplas:
+        nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], width=5, edge_color='red', ax=ax)
+    ax.set_title(f'Rede de Entrosamento por {scout_nome}')
+    ax.axis('off')
+    st.pyplot(fig)
+
+# Calcula médias por dupla no filtro atual
+def media_por_dupla(df_filt, scout):
+    soma = Counter()
+    semanas = Counter()
+    for semana, grupo in df_filt.groupby('Semana'):
+        jogs = grupo['Jogador'].unique()
+        for par in combinations(sorted(jogs), 2):
+            soma[par] += grupo[grupo['Jogador'].isin(par)][scout].sum()
+            semanas[par] += 1
+    return {par: soma[par]/semanas[par] if semanas[par]>0 else 0 for par in soma}
+
+media_gols = media_por_dupla(df_filt, 'Gol')
+media_assist = media_por_dupla(df_filt, 'Assistência')
+# Vitórias: conta 1 se ambos venceram na semana
+def media_vitorias_dupla(df_filt):
+    soma = Counter()
+    semanas = Counter()
+    for semana, grupo in df_filt.groupby('Semana'):
+        jogs = grupo['Jogador'].unique()
+        venceu = grupo[grupo['Situação'] == 'Vitória']['Jogador'].unique()
+        for par in combinations(sorted(jogs), 2):
+            semanas[par] += 1
+            if par[0] in venceu and par[1] in venceu:
+                soma[par] += 1
+    return {par: soma[par]/semanas[par] if semanas[par]>0 else 0 for par in soma}
+media_vit = media_vitorias_dupla(df_filt)
+
+plot_rede(media_gols, "Gols", "lightgreen", width_factor=2)
+plot_rede(media_assist, "Assistências", "violet", width_factor=3)
+plot_rede(media_vit, "Vitórias", "skyblue", width_factor=6)
+
+# --- ANÁLISE DE SUBSTITUIÇÃO ---
+st.markdown("## 🔄 Análise de Substituição")
+st.markdown("Veja o impacto da presença/ausência de cada jogador na média de gols do time no período filtrado.")
+
+resultados = []
+for jogador in jogadores:
+    semanas_com = df_filt[df_filt['Jogador'] == jogador]['Semana'].unique()
+    semanas_sem = [s for s in df_filt['Semana'].unique() if s not in semanas_com]
+    gols_com = df_filt[df_filt['Semana'].isin(semanas_com)].groupby('Semana')['Gol'].sum()
+    media_gol_com = gols_com.mean() if len(gols_com) > 0 else np.nan
+    gols_sem = df_filt[df_filt['Semana'].isin(semanas_sem)].groupby('Semana')['Gol'].sum()
+    media_gol_sem = gols_sem.mean() if len(gols_sem) > 0 else np.nan
+    resultados.append({
+        'Jogador': jogador,
+        'Gols_com': media_gol_com,
+        'Gols_sem': media_gol_sem,
+        'Diferença': media_gol_com - media_gol_sem if (media_gol_com is not np.nan and media_gol_sem is not np.nan) else np.nan
+    })
+df_subs = pd.DataFrame(resultados).sort_values('Diferença', ascending=False)
+st.dataframe(df_subs[['Jogador', 'Gols_com', 'Gols_sem', 'Diferença']].round(2), use_container_width=True)
+fig, ax = plt.subplots(figsize=(10, 4))
+ax.bar(df_subs['Jogador'], df_subs['Diferença'], color='orange')
+ax.axhline(0, color='gray', linestyle='--')
+ax.set_ylabel('Diferença na Média de Gols (com - sem)')
+ax.set_title('Impacto de Cada Jogador na Média de Gols do Time')
+plt.xticks(rotation=45)
+st.pyplot(fig)
+
+# --- DETECÇÃO DE OUTLIERS ---
+st.markdown("## 🚨 Detecção de Outliers")
+st.markdown("Jogadores que destoam do grupo em gols e assistências (acima do limite superior do IQR).")
+
+# Gols
+gols_total = df_filt.groupby('Jogador')['Gol'].sum()
+q1, q3 = gols_total.quantile([0.25, 0.75])
+iqr = q3 - q1
+limite_sup = q3 + 1.5 * iqr
+outliers_gol = gols_total[gols_total > limite_sup]
+
+# Assistências
+assist_total = df_filt.groupby('Jogador')['Assistência'].sum()
+q1a, q3a = assist_total.quantile([0.25, 0.75])
+iqra = q3a - q1a
+limite_supa = q3a + 1.5 * iqra
+outliers_assist = assist_total[assist_total > limite_supa]
+
+st.markdown(f"**Outliers em gols:** {', '.join(outliers_gol.index)}")
+st.markdown(f"**Outliers em assistências:** {', '.join(outliers_assist.index)}")
