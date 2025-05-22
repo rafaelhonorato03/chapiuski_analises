@@ -9,15 +9,10 @@ from email import encoders
 
 arquivo = "compras_ingressos.xlsx"
 
-st.markdown(
-    """
-    <div style="display: flex; justify-content: center;">
-        <img src="Confra/chapiuski.png" width="200"/>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
+col1, col2, col3 = st.columns([1,2,1])
+with col2:
+    st.image("Confra/chapiuski.png", width=200)
+    
 st.title("Compra de Ingressos - Festa Chapiuski")
 
 email = st.text_input("E-mail para contato")
