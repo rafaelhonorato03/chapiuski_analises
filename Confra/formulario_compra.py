@@ -46,7 +46,7 @@ Das <b>17h às 20h30</b> (com pausa de 30 min)<br><br>
 - Proibido drogas ilícitas e narguilé.<br>
 - Preencha o site e envie o comprovante para validar sua compra.<br><br>
 
-🎊 <b>Garanta já seu ingresso e venha viver a melhor confraternização do Chapiuski!</b> 🎊
+🎊 <b>Garanta já seu ingresso e venha venha comemorar o 8° ano do Chapiuski!</b> 🎊
 </div>
 """, unsafe_allow_html=True)
 
