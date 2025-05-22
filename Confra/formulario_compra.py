@@ -9,6 +9,7 @@ from email import encoders
 
 arquivo = "compras_ingressos.xlsx"
 
+st.image("Confra\chapiuski.png", width=200)  # ajuste o caminho e o tamanho conforme necessário
 st.title("Compra de Ingressos - Festa Chapiuski")
 
 email = st.text_input("E-mail para contato")
