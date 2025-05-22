@@ -9,7 +9,15 @@ from email import encoders
 
 arquivo = "compras_ingressos.xlsx"
 
-st.image("Confra\chapiuski.png", width=200)  # ajuste o caminho e o tamanho conforme necessário
+st.markdown(
+    """
+    <div style="display: flex; justify-content: center;">
+        <img src="Confra/chapiuski.png" width="200"/>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("Compra de Ingressos - Festa Chapiuski")
 
 email = st.text_input("E-mail para contato")
@@ -53,6 +61,7 @@ if st.button("Reservar ingresso e Enviar Pedido"):
     remetente = st.secrets["email"]["remetente"]
     senha = st.secrets["email"]["senha"]
     destinatario = st.secrets["email"]["destinatario"]
+    lista_destinatarios = [d.strip() for d in destinatario.split(",")]
 
     corpo = f"""
 Novo pedido de ingresso:
@@ -81,7 +90,7 @@ Participantes:
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(remetente, senha)
-            server.sendmail(remetente, destinatario, msg.as_string())
+            server.sendmail(remetente, lista_destinatarios, msg.as_string())
         st.success("Dados enviados por e-mail para a organização!")
     except Exception as e:
         st.error(f"Erro ao enviar e-mail: {e}")
