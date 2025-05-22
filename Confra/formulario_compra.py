@@ -11,9 +11,44 @@ arquivo = "compras_ingressos.xlsx"
 
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
-    st.image("Confra/chapiuski.png", width=200)
+    st.image("Confra/chapiuski.jpg", width=800)
     
-st.title("Compra de Ingressos - Festa Chapiuski")
+st.title("Compra de Ingressos - Confra Chapiuski 2025")
+
+st.markdown("""
+<div style='font-size:18px'>
+<b>🥩🍻 OPEN FOOD & OPEN BAR!</b><br>
+Prepare-se para uma explosão de sabores e diversão!<br>
+- Churrasco liberado o dia todo<br>
+- Guarnições deliciosas<br>
+- Lanches de Cupim e Costela<br>
+- Chopp geladíssimo<br>
+- Vodka, Cachaça, Refrigerantes, Sucos e Água à vontade!<br><br>
+
+<b>🎶 ATRAÇÃO IMPERDÍVEL!</b><br>
+Sinta o clima: Grupo de pagode com o Alemão!<br>
+Das <b>17h às 20h30</b> (com pausa de 30 min)<br><br>
+
+<b>⏰ Encerramento: 22h</b><br><br>
+
+<b>💰 VALORES</b><br>
+1º LOTE PROMOCIONAL: <b> R&#36; 100,00 no PIX </b> ou <b> R&#36; 105,00 no link </b> (em até 10x)<br>
+2º e 3º LOTE: valores e datas a definir após o término do lote promocional.<br><br>
+
+<b>💳 FORMAS DE PAGAMENTO</b><br>
+- PIX com desconto: <b>(11)99499-1465</b><br>
+- Débito e Crédito: Link de pagamento (até 10x com taxa)<br><br>
+
+<b>⚠️ REGRAS</b><br>
+- Crianças até 12 anos não pagam. A partir de 13 anos, pagam integral.<br>
+- Documento com foto obrigatório na entrada.<br>
+- Elevador: uso exclusivo para idosos e PCD.<br>
+- Proibido drogas ilícitas e narguilé.<br>
+- Preencha o site e envie o comprovante para validar sua compra.<br><br>
+
+🎊 <b>Garanta já seu ingresso e venha viver a melhor confraternização do Chapiuski!</b> 🎊
+</div>
+""", unsafe_allow_html=True)
 
 email = st.text_input("E-mail para contato")
 quantidade = st.number_input("Quantidade de ingressos", min_value=1, max_value=10, value=1)
@@ -43,14 +78,23 @@ novo_pedido = {
 }
 
 if st.button("Reservar ingresso e Enviar Pedido"):
-    # Salva no Excel (cria se não existir)
-    if os.path.exists(arquivo):
-        df = pd.read_excel(arquivo)
-        df = pd.concat([df, pd.DataFrame([novo_pedido])], ignore_index=True)
+    # Verifica se todos os campos estão preenchidos
+    if (
+        email.strip() == "" or
+        any(nome.strip() == "" for nome in nomes) or
+        any(doc.strip() == "" for doc in documentos) or
+        comprovante is None
+    ):
+        st.warning("Por favor, preencha todos os campos e envie o comprovante antes de enviar o pedido.")
     else:
-        df = pd.DataFrame([novo_pedido])
-    df.to_excel(arquivo, index=False)
-    st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
+        # Salva no Excel (cria se não existir)
+        if os.path.exists(arquivo):
+            df = pd.read_excel(arquivo)
+            df = pd.concat([df, pd.DataFrame([novo_pedido])], ignore_index=True)
+        else:
+            df = pd.DataFrame([novo_pedido])
+        df.to_excel(arquivo, index=False)
+        st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
 
     # Envia o pedido por e-mail com comprovante (se houver)
     remetente = st.secrets["email"]["remetente"]
