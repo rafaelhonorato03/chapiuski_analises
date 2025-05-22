@@ -1,23 +1,53 @@
+import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
+import os
 
-festa = pd.read_excel('Confra\chapiuski_festa.xlsx')
+arquivo = "compras_ingressos.xlsx"
 
-print(festa)
-print(festa['Lote'].value_counts())
+st.title("Compra de Ingressos - Festa Chapiuski")
 
-# cOnta o número de ingressos por data
-festa['Data'] = pd.to_datetime(festa['Data'])
-ingressos_por_data = festa['Data'].value_counts().sort_index()
-ingressos_cumulativos = ingressos_por_data.cumsum()
+email = st.text_input("E-mail para contato")
+quantidade = st.number_input("Quantidade de ingressos", min_value=1, max_value=10, value=1)
 
-# Grafico de linha cumulativo
-plt.figure(figsize=(10,5))
-plt.plot(ingressos_cumulativos.index, ingressos_cumulativos.values, marker='o', color='royalblue')
-plt.xlabel('Data')
-plt.ylabel('Número de Ingressos')
-plt.title('Número de Ingressos por Data')
-plt.xticks(rotation=45)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-plt.show()
+# Campos dinâmicos para nomes e documentos dos participantes
+nomes = []
+documentos = []
+for i in range(int(quantidade)):
+    nome = st.text_input(f"Nome do participante #{i+1}")
+    doc = st.text_input(f"Documento do participante #{i+1}")
+    nomes.append(nome)
+    documentos.append(doc)
+
+# Link de pagamento (exemplo, ajuste conforme seu lote)
+link_pagamento = "https://pag.ae/7_FMHdgNJ"
+
+# Dados do novo pedido
+novo_pedido = {
+    'E-mail': email,
+    'Quantidade': quantidade,
+    'Nomes': ', '.join(nomes),
+    'Documentos': ', '.join(documentos)
+}
+
+if st.button("Reservar ingresso"):
+    # Salva no Excel (cria se não existir)
+    if os.path.exists(arquivo):
+        df = pd.read_excel(arquivo)
+        df = pd.concat([df, pd.DataFrame([novo_pedido])], ignore_index=True)
+    else:
+        df = pd.DataFrame([novo_pedido])
+    df.to_excel(arquivo, index=False)
+    st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
+
+    st.markdown(f"### 💳 [Clique aqui para pagar seu ingresso]({link_pagamento})")
+
+    st.info("Após o pagamento, envie o comprovante abaixo:")
+
+    comprovante = st.file_uploader("Envie o comprovante de pagamento (imagem ou PDF)", type=["png", "jpg", "jpeg", "pdf"])
+    if comprovante is not None:
+        # Salva o comprovante na pasta 'comprovantes'
+        os.makedirs("comprovantes", exist_ok=True)
+        caminho = f"comprovantes/{email.replace('@','_').replace('.','_')}_{comprovante.name}"
+        with open(caminho, "wb") as f:
+            f.write(comprovante.getbuffer())
+        st.success("Comprovante enviado com sucesso!")
