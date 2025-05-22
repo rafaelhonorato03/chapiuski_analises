@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
 import os
+from datetime import datetime
 
 arquivo = "compras_ingressos.xlsx"
 
+st.image("Confra\chapiuski.png", width=200)  # ajuste o caminho e o tamanho conforme necessário
 st.title("Compra de Ingressos - Festa Chapiuski")
 
 email = st.text_input("E-mail para contato")
@@ -26,7 +28,8 @@ novo_pedido = {
     'E-mail': email,
     'Quantidade': quantidade,
     'Nomes': ', '.join(nomes),
-    'Documentos': ', '.join(documentos)
+    'Documentos': ', '.join(documentos),
+    'DataHora': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 }
 
 if st.button("Reservar ingresso"):
