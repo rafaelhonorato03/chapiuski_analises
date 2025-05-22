@@ -25,6 +25,7 @@ for i in range(int(quantidade)):
 
 # Link de pagamento (exemplo, ajuste conforme seu lote)
 link_pagamento = "https://pag.ae/7_FMHdgNJ"
+st.markdown(f"### 💳 [Clique aqui para pagar seu ingresso]({link_pagamento})")
 
 # Upload do comprovante
 comprovante = st.file_uploader("Envie o comprovante de pagamento (imagem ou PDF)", type=["png", "jpg", "jpeg", "pdf"])
@@ -46,8 +47,6 @@ if st.button("Reservar ingresso e Enviar Pedido"):
         df = pd.DataFrame([novo_pedido])
     df.to_excel(arquivo, index=False)
     st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
-
-    st.markdown(f"### 💳 [Clique aqui para pagar seu ingresso]({link_pagamento})")
 
     # Envia o pedido por e-mail com comprovante (se houver)
     remetente = st.secrets["email"]["remetente"]
