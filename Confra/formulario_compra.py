@@ -76,8 +76,11 @@ with st.form("formulario_ingresso"):
     nomes = []
     documentos = []
     for i in range(int(quantidade)):
-        nome = st.text_input(f"Nome do participante #{i+1}")
-        doc = st.text_input(f"Documento do participante #{i+1}")
+        col1, col2 = st.columns(2)
+        with col1:
+            nome = st.text_input(f"Nome do participante #{i+1}", key=f"nome_{i}")
+        with col2:
+            doc = st.text_input(f"Documento do participante #{i+1}", key=f"doc_{i}")
         nomes.append(nome)
         documentos.append(doc)
 
