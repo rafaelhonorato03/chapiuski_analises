@@ -166,9 +166,9 @@ with st.form("formulario_ingresso"):
             st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
 
             # Envia o pedido por e-mail com comprovante
-            remetente = st.secrets["email"]["remetente"]
-            senha = st.secrets["email"]["senha"]
-            destinatario = st.secrets["email"]["destinatario"]
+            remetente = os.getenv("EMAIL_REMETENTE")
+            senha = os.getenv("EMAIL_SENHA")
+            destinatario = os.getenv("EMAIL_DESTINATARIO")
             lista_destinatarios = [d.strip() for d in destinatario.split(",")]
 
             corpo = f"""
