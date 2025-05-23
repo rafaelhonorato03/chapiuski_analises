@@ -29,7 +29,7 @@ if not CREDENTIALS_JSON:
     st.stop()
 
 if not os.path.isfile(CREDENTIALS_JSON):
-    st.error(f"Arquivo de credenciais não encontrado: {CREDENTIALS}")
+    st.error(f"Arquivo de credenciais não encontrado: {CREDENTIALS_JSON}")
     st.stop()
 
 creds_info = json.loads(CREDENTIALS_JSON)
