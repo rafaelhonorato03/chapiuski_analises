@@ -10,6 +10,7 @@ from email import encoders
 from datetime import datetime
 import re
 
+# Carrega variáveis de ambiente
 load_dotenv()
 
 # --- Funções auxiliares ---
@@ -17,57 +18,70 @@ load_dotenv()
 def email_valido(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
-def enviar_email(remetente, senha, destinatarios, assunto, corpo, comprovante):
+def enviar_email(remetente, senha, destinatarios, assunto, corpo, comprovante, arquivo_csv):
     msg = MIMEMultipart()
     msg['Subject'] = assunto
     msg['From'] = remetente
     msg['To'] = ", ".join(destinatarios)
     msg.attach(MIMEText(corpo, 'plain'))
+
+    # Anexa o comprovante
     if comprovante is not None:
-        file_data = comprovante.read()
         part = MIMEBase('application', "octet-stream")
+        file_data = comprovante.getvalue()
         part.set_payload(file_data)
         encoders.encode_base64(part)
         part.add_header('Content-Disposition', f'attachment; filename="{comprovante.name}"')
         msg.attach(part)
+
+    # Anexa o CSV como backup
+    if os.path.exists(arquivo_csv):
+        with open(arquivo_csv, "rb") as f:
+            part_csv = MIMEBase('application', "octet-stream")
+            part_csv.set_payload(f.read())
+            encoders.encode_base64(part_csv)
+            part_csv.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(arquivo_csv)}"')
+            msg.attach(part_csv)
+
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(remetente, senha)
         server.sendmail(remetente, destinatarios, msg.as_string())
 
-# --- Interface ---
+# --- Arquivo de Dados ---
+# Salva o CSV na mesma pasta do script
+arquivo = os.path.join(os.path.dirname(__file__), "compras_ingressos.csv")
 
-arquivo = "compras_ingressos.csv"
-
+# --- Estoque ---
 estoque_lotes = {
     "1º LOTE PROMOCIONAL": 2,
     "2º LOTE": 1,
 }
 
-# Verifica o número de ingressos já vendidos
+# --- Verificar ingressos vendidos ---
 if os.path.exists(arquivo):
     df_compras = pd.read_csv(arquivo)
     total_vendidos = df_compras['Quantidade'].sum()
 else:
     total_vendidos = 0
 
-# Define o lote atual
+# --- Definir lote atual ---
 if total_vendidos < estoque_lotes["1º LOTE PROMOCIONAL"]:
     lote_atual = "1º LOTE PROMOCIONAL"
     link_pagamento = "https://pag.ae/7_FMHdgNJ"
     estoque_disponivel = estoque_lotes["1º LOTE PROMOCIONAL"] - total_vendidos
-    lote_info = "R&#36; 100,00 no PIX ou R&#36; 105,00 no link (em até 10x)"
+    lote_info = "R$ 100,00 no PIX ou R$ 105,00 no link (em até 10x)"
 elif total_vendidos < (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]):
     lote_atual = "2º LOTE"
     link_pagamento = "https://pag.ae/7_FMKBcQs"
     estoque_disponivel = (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]) - total_vendidos
-    lote_info = "R&#36; 120,00 no PIX ou R&#36; 125,00 no link (em até 10x)"
+    lote_info = "R$ 120,00 no PIX ou R$ 125,00 no link (em até 10x)"
 else:
     lote_atual = "Ingressos esgotados"
     link_pagamento = None
     estoque_disponivel = 0
     lote_info = ""
 
-# Centraliza o logo
+# --- Layout ---
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
     st.image("Confra/chapiuski.jpg", width=800)
@@ -84,7 +98,7 @@ st.markdown("""
 **⏰ Encerramento: 22h**
 
 **💰 VALORES**
-- 1º LOTE PROMOCIONAL: **R&#36; 100,00 no PIX** ou **R&#36; 105,00 no link** (em até 10x)
+- 1º LOTE PROMOCIONAL: **R$ 100,00 no PIX** ou **R$ 105,00 no link** (em até 10x)
 - 2º e 3º LOTE: valores e datas a definir após o término do lote promocional.
 
 **💳 FORMAS DE PAGAMENTO**
@@ -101,7 +115,7 @@ st.markdown("""
 🎊 **Garanta já seu ingresso e venha comemorar o 8° ano do Chapiuski!** 🎊
 """)
 
-# Exibe o lote acima da quantidade
+# --- Lote ---
 st.markdown(f"### {lote_atual}")
 if lote_info:
     st.markdown(f"**{lote_info}**")
@@ -119,6 +133,7 @@ else:
     st.warning("Ingressos esgotados.")
     st.stop()
 
+# --- Formulário ---
 with st.form("formulario_ingresso"):
     email = st.text_input("E-mail para contato")
 
@@ -136,12 +151,15 @@ with st.form("formulario_ingresso"):
     if link_pagamento:
         st.markdown(f"### 💳 [Clique aqui para pagar seu ingresso]({link_pagamento})")
 
-    comprovante = st.file_uploader("Envie o comprovante de pagamento (imagem ou PDF)", type=["png", "jpg", "jpeg", "pdf"])
+    comprovante = st.file_uploader(
+        "Envie o comprovante de pagamento (imagem ou PDF)", 
+        type=["png", "jpg", "jpeg", "pdf"]
+    )
 
     enviado = st.form_submit_button("Reservar ingresso e Enviar Pedido")
 
     if enviado:
-        # Validação dos campos
+        # --- Validação dos campos ---
         if (
             email.strip() == "" or
             not email_valido(email) or
@@ -159,19 +177,21 @@ with st.form("formulario_ingresso"):
                 'Documentos': ', '.join(documentos),
                 'DataHora': datahora
             }
-            # Salva no Excel (cria se não existir)
+
+            # --- Salvar CSV ---
             if os.path.exists(arquivo):
                 df = pd.read_csv(arquivo)
                 df = pd.concat([df, pd.DataFrame([novo_pedido])], ignore_index=True)
             else:
                 df = pd.DataFrame([novo_pedido])
             df.to_csv(arquivo, index=False)
+
             st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
 
-            # Envia o pedido por e-mail com comprovante
-            remetente = st.secrets["EMAIL_REMETENTE"]
-            senha = st.secrets["EMAIL_SENHA"]
-            destinatario = st.secrets["EMAIL_DESTINATARIO"]
+            # --- Enviar e-mail ---
+            remetente = os.getenv("EMAIL_REMETENTE")
+            senha = os.getenv("EMAIL_SENHA")
+            destinatario = os.getenv("EMAIL_DESTINATARIO")
 
             if not remetente or not senha or not destinatario:
                 st.error("❌ Variáveis de ambiente não configuradas corretamente.")
@@ -190,7 +210,15 @@ Participantes:
 """ + "\n".join([f"{i+1}. Nome: {nomes[i]}, Documento: {documentos[i]}" for i in range(int(quantidade))])
 
             try:
-                enviar_email(remetente, senha, lista_destinatarios, "Novo pedido de ingresso", corpo, comprovante)
+                enviar_email(
+                    remetente,
+                    senha,
+                    lista_destinatarios,
+                    "Novo pedido de ingresso",
+                    corpo,
+                    comprovante,
+                    arquivo
+                )
                 st.success("Dados enviados por e-mail para a organização!")
             except Exception as e:
                 st.error(f"Erro ao enviar e-mail: {e}")
