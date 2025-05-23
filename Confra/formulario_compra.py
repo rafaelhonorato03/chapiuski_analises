@@ -20,11 +20,17 @@ scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
+cred_path = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
 
-CREDENTIALS = Credentials.from_service_account_file(
-    os.getenv("GOOGLE_SHEETS_CREDENTIALS"),
-    scopes=scopes
-)
+if not cred_path:
+    st.error("Variável de ambiente GOOGLE_SHEETS_CREDENTIALS não encontrada!")
+    st.stop()
+
+if not os.path.isfile(cred_path):
+    st.error(f"Arquivo de credenciais não encontrado: {cred_path}")
+    st.stop()
+
+CREDENTIALS = Credentials.from_service_account_file(cred_path, scopes=scopes)
 
 # Autenticação
 gc = gspread.authorize(CREDENTIALS)
