@@ -158,7 +158,7 @@ with st.form("formulario_ingresso"):
             }
             # Salva no Excel (cria se não existir)
             if os.path.exists(arquivo):
-                df = pd.read_excel(arquivo)
+                df = pd.read_csv(arquivo)
                 df = pd.concat([df, pd.DataFrame([novo_pedido])], ignore_index=True)
             else:
                 df = pd.DataFrame([novo_pedido])
