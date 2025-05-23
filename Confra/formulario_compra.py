@@ -169,9 +169,9 @@ with st.form("formulario_ingresso"):
             st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
 
             # Envia o pedido por e-mail com comprovante
-            remetente = os.getenv("EMAIL_REMETENTE")
-            senha = os.getenv("EMAIL_SENHA")
-            destinatario = os.getenv("EMAIL_DESTINATARIO")
+            remetente = st.secrets["EMAIL_REMETENTE"]
+            senha = st.secrets["EMAIL_SENHA"]
+            destinatario = st.secrets["EMAIL_DESTINATARIO"]
 
             if not remetente or not senha or not destinatario:
                 st.error("❌ Variáveis de ambiente não configuradas corretamente.")
