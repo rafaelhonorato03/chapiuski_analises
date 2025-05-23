@@ -198,12 +198,12 @@ with st.form("formulario_ingresso"):
             }
 
             # --- Salvar CSV ---
-            if os.path.exists(arquivo):
-                df = pd.read_csv(arquivo)
+            if os.path.exists(arquivo_csv):
+                df = pd.read_csv(arquivo_csv)
                 df = pd.concat([df, pd.DataFrame([novo_pedido])], ignore_index=True)
             else:
                 df = pd.DataFrame([novo_pedido])
-            df.to_csv(arquivo, index=False)
+            df.to_csv(arquivo_csv, index=False)
 
             st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
             remetente = os.getenv("EMAIL_REMETENTE")
