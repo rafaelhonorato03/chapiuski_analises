@@ -11,7 +11,7 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 import re
-
+import json
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -21,18 +21,19 @@ scopes = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-CREDENTIALS = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
+CREDENTIALS_JSON = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
 sheet_id = os.getenv("GOOGLE_SHEET_ID")
 
-if not CREDENTIALS:
+if not CREDENTIALS_JSON:
     st.error("Variável de ambiente GOOGLE_SHEETS_CREDENTIALS não encontrada!")
     st.stop()
 
-if not os.path.isfile(CREDENTIALS):
+if not os.path.isfile(CREDENTIALS_JSON):
     st.error(f"Arquivo de credenciais não encontrado: {CREDENTIALS}")
     st.stop()
 
-creds = Credentials.from_service_account_file(CREDENTIALS, scopes=scopes)
+creds_info = json.loads(CREDENTIALS_JSON)
+creds = Credentials.from_service_account_file(creds_info, scopes=scopes)
 gc = gspread.authorize(creds)
 
 spreadsheet = gc.open_by_key(sheet_id)
