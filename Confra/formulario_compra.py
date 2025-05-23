@@ -28,12 +28,13 @@ if not CREDENTIALS_JSON:
     st.error("Variável de ambiente GOOGLE_SHEETS_CREDENTIALS não encontrada!")
     st.stop()
 
-if not os.path.isfile(CREDENTIALS_JSON):
-    st.error(f"Arquivo de credenciais não encontrado: {CREDENTIALS_JSON}")
+try:
+    creds_info = json.loads(CREDENTIALS_JSON)
+except json.JSONDecodeError as e:
+    st.error(f"Erro ao decodificar JSON das credenciais: {e}")
     st.stop()
 
-creds_info = json.loads(CREDENTIALS_JSON)
-creds = Credentials.from_service_account_file(creds_info, scopes=scopes)
+creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
 gc = gspread.authorize(creds)
 
 spreadsheet = gc.open_by_key(sheet_id)
