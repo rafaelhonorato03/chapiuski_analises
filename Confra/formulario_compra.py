@@ -187,12 +187,6 @@ with st.form("formulario_ingresso"):
             df.to_csv(arquivo, index=False)
 
             st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
-
-<<<<<<< HEAD
-            # --- Enviar e-mail ---
-=======
-            # Envia o pedido por e-mail com comprovante
->>>>>>> parent of d76a6da (Update formulario_compra.py)
             remetente = os.getenv("EMAIL_REMETENTE")
             senha = os.getenv("EMAIL_SENHA")
             destinatario = os.getenv("EMAIL_DESTINATARIO")
