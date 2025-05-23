@@ -35,6 +35,35 @@ def enviar_email(remetente, senha, destinatarios, assunto, corpo, comprovante):
 
 arquivo = "compras_ingressos.xlsx"
 
+estoque_lotes = {
+    "1º LOTE PROMOCIONAL": 2,
+    "2º LOTE": 1,
+}
+
+# Verifica o número de ingressos já vendidos
+if os.path.exists(arquivo):
+    df_compras = pd.read_excel(arquivo)
+    total_vendidos = df_compras['Quantidade'].sum()
+else:
+    total_vendidos = 0
+
+# Define o lote atual
+if total_vendidos < estoque_lotes["1º LOTE PROMOCIONAL"]:
+    lote_atual = "1º LOTE PROMOCIONAL"
+    link_pagamento = "https://pag.ae/7_FMHdgNJ"
+    estoque_disponivel = estoque_lotes["1º LOTE PROMOCIONAL"] - total_vendidos
+    lote_info = "R&#36; 100,00 no PIX ou R&#36; 105,00 no link (em até 10x)"
+elif total_vendidos < (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]):
+    lote_atual = "2º LOTE"
+    link_pagamento = "https://pag.ae/7_FMKBcQs"
+    estoque_disponivel = (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]) - total_vendidos
+    lote_info = "R&#36; 120,00 no PIX ou R&#36; 125,00 no link (em até 10x)"
+else:
+    lote_atual = "Ingressos esgotados"
+    link_pagamento = None
+    estoque_disponivel = 0
+    lote_info = ""
+
 # Centraliza o logo
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
@@ -69,9 +98,26 @@ st.markdown("""
 🎊 **Garanta já seu ingresso e venha comemorar o 8° ano do Chapiuski!** 🎊
 """)
 
+# Exibe o lote acima da quantidade
+st.markdown(f"### {lote_atual}")
+if lote_info:
+    st.markdown(f"**{lote_info}**")
+
+if estoque_disponivel > 0:
+    quantidade = st.number_input(
+        "Quantidade de ingressos",
+        min_value=1,
+        max_value=int(estoque_disponivel),
+        value=1,
+        step=1,
+        key="quantidade_ingressos"
+    )
+else:
+    st.warning("Ingressos esgotados.")
+    st.stop()
+
 with st.form("formulario_ingresso"):
     email = st.text_input("E-mail para contato")
-    quantidade = st.number_input("Quantidade de ingressos", min_value=1, max_value=10, value=1)
 
     nomes = []
     documentos = []
@@ -84,8 +130,8 @@ with st.form("formulario_ingresso"):
         nomes.append(nome)
         documentos.append(doc)
 
-    link_pagamento = "https://pag.ae/7_FMHdgNJ"
-    st.markdown(f"### 💳 [Clique aqui para pagar seu ingresso]({link_pagamento})")
+    if link_pagamento:
+        st.markdown(f"### 💳 [Clique aqui para pagar seu ingresso]({link_pagamento})")
 
     comprovante = st.file_uploader("Envie o comprovante de pagamento (imagem ou PDF)", type=["png", "jpg", "jpeg", "pdf"])
 
