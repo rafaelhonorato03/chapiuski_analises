@@ -9,6 +9,43 @@ from email.mime.base import MIMEBase
 from email import encoders
 from datetime import datetime
 import re
+import gspread
+from google.oauth2.service_account import Credentials
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
+import re
+
+scopes = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+# Substitua pelo caminho do seu arquivo JSON
+credenciais = Credentials.from_service_account_file(
+    "GOOGLE_SHEETS_CREDENTIALS",
+    scopes=scopes
+)
+
+# Autenticação
+gc = gspread.authorize(credenciais)
+
+# Abrir a planilha
+spreadsheet = gc.open("Nome_da_sua_planilha")
+
+# Selecionar aba
+sheet = spreadsheet.worksheet("Página1")  # ou pelo nome da aba
+
+# Ler dados existentes
+dados = sheet.get_all_records()
+
+# Converter para DataFrame
+df_compras = pd.DataFrame(dados)
+
+# Verificar total vendido
+if not df_compras.empty:
+    total_vendidos = df_compras['Quantidade'].sum()
+else:
+    total_vendidos = 0
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -56,13 +93,6 @@ estoque_lotes = {
     "1º LOTE PROMOCIONAL": 2,
     "2º LOTE": 1,
 }
-
-# --- Verificar ingressos vendidos ---
-if os.path.exists(arquivo):
-    df_compras = pd.read_csv(arquivo)
-    total_vendidos = df_compras['Quantidade'].sum()
-else:
-    total_vendidos = 0
 
 # --- Definir lote atual ---
 if total_vendidos < estoque_lotes["1º LOTE PROMOCIONAL"]:
@@ -220,3 +250,15 @@ Participantes:
                 st.success("Dados enviados por e-mail para a organização!")
             except Exception as e:
                 st.error(f"Erro ao enviar e-mail: {e}")
+
+# Dados do novo pedido
+novo_pedido = [
+    email,
+    quantidade,
+    ', '.join(nomes),
+    ', '.join(documentos),
+    datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+]
+
+# Inserir nova linha no final
+sheet.append_row(novo_pedido)
