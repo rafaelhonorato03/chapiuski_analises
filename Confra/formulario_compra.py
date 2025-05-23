@@ -8,21 +8,20 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from datetime import datetime
-import re
 import gspread
 from google.oauth2.service_account import Credentials
-from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
 import re
+
+# Carrega variáveis de ambiente
+load_dotenv()
 
 scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Substitua pelo caminho do seu arquivo JSON
 credenciais = Credentials.from_service_account_file(
-    "GOOGLE_SHEETS_CREDENTIALS",
+    os.getenv("GOOGLE_SHEETS_CREDENTIALS"),
     scopes=scopes
 )
 
@@ -30,7 +29,7 @@ credenciais = Credentials.from_service_account_file(
 gc = gspread.authorize(credenciais)
 
 # Abrir a planilha
-spreadsheet = gc.open("Nome_da_sua_planilha")
+spreadsheet = gc.open("chapiuski_confra_25")
 
 # Selecionar aba
 sheet = spreadsheet.worksheet("Página1")  # ou pelo nome da aba
@@ -41,16 +40,10 @@ dados = sheet.get_all_records()
 # Converter para DataFrame
 df_compras = pd.DataFrame(dados)
 
-# Verificar total vendido
-if not df_compras.empty:
-    total_vendidos = df_compras['Quantidade'].sum()
-else:
-    total_vendidos = 0
+total_vendidos = df_compras['Quantidade'].sum() if not df_compras.empty else 0
 
-# Carrega variáveis de ambiente
-load_dotenv()
+arquivo_csv = os.path.join(os.path.dirname(__file__), "compras_ingressos.csv")
 
-# --- Funções auxiliares ---
 
 def email_valido(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
@@ -84,9 +77,6 @@ def enviar_email(remetente, senha, destinatarios, assunto, corpo, comprovante, a
         server.login(remetente, senha)
         server.sendmail(remetente, destinatarios, msg.as_string())
 
-# --- Arquivo de Dados ---
-# Salva o CSV na mesma pasta do script
-arquivo = os.path.join(os.path.dirname(__file__), "compras_ingressos.csv")
 
 # --- Estoque ---
 estoque_lotes = {
@@ -150,18 +140,17 @@ st.markdown(f"### {lote_atual}")
 if lote_info:
     st.markdown(f"**{lote_info}**")
 
-if estoque_disponivel > 0:
-    quantidade = st.number_input(
-        "Quantidade de ingressos",
-        min_value=1,
-        max_value=int(estoque_disponivel),
-        value=1,
-        step=1,
-        key="quantidade_ingressos"
-    )
-else:
+if estoque_disponivel == 0:
     st.warning("Ingressos esgotados.")
     st.stop()
+
+quantidade = st.number_input(
+    "Quantidade de ingressos",
+    min_value=1,
+    max_value=int(estoque_disponivel),
+    value=1,
+    step=1
+)
 
 # --- Formulário ---
 with st.form("formulario_ingresso"):
@@ -245,20 +234,17 @@ Participantes:
                     "Novo pedido de ingresso",
                     corpo,
                     comprovante,
-                    arquivo
+                    arquivo_csv
                 )
                 st.success("Dados enviados por e-mail para a organização!")
             except Exception as e:
                 st.error(f"Erro ao enviar e-mail: {e}")
 
-# Dados do novo pedido
-novo_pedido = [
-    email,
-    quantidade,
-    ', '.join(nomes),
-    ', '.join(documentos),
-    datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-]
-
-# Inserir nova linha no final
-sheet.append_row(novo_pedido)
+            # Enviar para Google Sheets
+            sheet.append_row([
+                email,
+                quantidade,
+                ', '.join(nomes),
+                ', '.join(documentos),
+                datahora
+            ])
