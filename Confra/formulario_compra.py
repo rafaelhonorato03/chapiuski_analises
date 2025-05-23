@@ -33,7 +33,7 @@ def enviar_email(remetente, senha, destinatarios, assunto, corpo, comprovante):
 
 # --- Interface ---
 
-arquivo = "compras_ingressos.xlsx"
+arquivo = "compras_ingressos.csv"
 
 estoque_lotes = {
     "1º LOTE PROMOCIONAL": 2,
@@ -42,7 +42,7 @@ estoque_lotes = {
 
 # Verifica o número de ingressos já vendidos
 if os.path.exists(arquivo):
-    df_compras = pd.read_excel(arquivo)
+    df_compras = pd.read_csv(arquivo)
     total_vendidos = df_compras['Quantidade'].sum()
 else:
     total_vendidos = 0
@@ -162,7 +162,7 @@ with st.form("formulario_ingresso"):
                 df = pd.concat([df, pd.DataFrame([novo_pedido])], ignore_index=True)
             else:
                 df = pd.DataFrame([novo_pedido])
-            df.to_excel(arquivo, index=False)
+            df.to_csv(arquivo, index=False)
             st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
 
             # Envia o pedido por e-mail com comprovante
