@@ -69,12 +69,12 @@ if total_vendidos < estoque_lotes["1º LOTE PROMOCIONAL"]:
     lote_atual = "1º LOTE PROMOCIONAL"
     link_pagamento = "https://pag.ae/7_FMHdgNJ"
     estoque_disponivel = estoque_lotes["1º LOTE PROMOCIONAL"] - total_vendidos
-    lote_info = "R&#36; 100,00 no PIX ou R&#36; 105,00 no link (em até 10x)"
+    lote_info = "RS 100,00 no PIX ou RS 105,00 no link (em até 10x)"
 elif total_vendidos < (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]):
     lote_atual = "2º LOTE"
     link_pagamento = "https://pag.ae/7_FMKBcQs"
     estoque_disponivel = (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]) - total_vendidos
-    lote_info = "R&#36; 120,00 no PIX ou R&#36; 125,00 no link (em até 10x)"
+    lote_info = "RS 120,00 no PIX ou RS 125,00 no link (em até 10x)"
 else:
     lote_atual = "Ingressos esgotados"
     link_pagamento = None
@@ -98,7 +98,7 @@ st.markdown("""
 **⏰ Encerramento: 22h**
 
 **💰 VALORES**
-- 1º LOTE PROMOCIONAL: **R&#36; 100,00 no PIX** ou **R&#36; 105,00 no link** (em até 10x)
+- 1º LOTE PROMOCIONAL: **RS 100,00 no PIX** ou **RS 105,00 no link** (em até 10x)
 - 2º e 3º LOTE: valores e datas a definir após o término do lote promocional.
 
 **💳 FORMAS DE PAGAMENTO**
