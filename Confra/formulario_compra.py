@@ -12,6 +12,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import re
 
+
 # Carrega variáveis de ambiente
 load_dotenv()
 
@@ -20,13 +21,13 @@ scopes = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-credenciais = Credentials.from_service_account_file(
+CREDENTIALS = Credentials.from_service_account_file(
     os.getenv("GOOGLE_SHEETS_CREDENTIALS"),
     scopes=scopes
 )
 
 # Autenticação
-gc = gspread.authorize(credenciais)
+gc = gspread.authorize(CREDENTIALS)
 
 # Abrir a planilha
 spreadsheet = gc.open("chapiuski_confra_25")
