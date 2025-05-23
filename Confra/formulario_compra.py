@@ -20,23 +20,22 @@ scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-cred_path = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
 
-if not cred_path:
+CREDENTIALS = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
+sheet_id = os.getenv("GOOGLE_SHEET_ID")
+
+if not CREDENTIALS:
     st.error("Variável de ambiente GOOGLE_SHEETS_CREDENTIALS não encontrada!")
     st.stop()
 
-if not os.path.isfile(cred_path):
-    st.error(f"Arquivo de credenciais não encontrado: {cred_path}")
+if not os.path.isfile(CREDENTIALS):
+    st.error(f"Arquivo de credenciais não encontrado: {CREDENTIALS}")
     st.stop()
 
-CREDENTIALS = Credentials.from_service_account_file(cred_path, scopes=scopes)
+creds = Credentials.from_service_account_file(CREDENTIALS, scopes=scopes)
+gc = gspread.authorize(creds)
 
-# Autenticação
-gc = gspread.authorize(CREDENTIALS)
-
-# Abrir a planilha
-spreadsheet = gc.open("chapiuski_confra_25")
+spreadsheet = gc.open_by_key(sheet_id)
 
 # Selecionar aba
 sheet = spreadsheet.worksheet("Página1")  # ou pelo nome da aba
