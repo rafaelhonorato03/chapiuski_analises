@@ -4,3 +4,4 @@ openpyxl
 python-dotenv
 gspread
 oauth2client
+supabase
