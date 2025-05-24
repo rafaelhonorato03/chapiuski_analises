@@ -184,19 +184,8 @@ with st.form("formulario_ingresso"):
         "Envie o comprovante de pagamento (imagem ou PDF)",
         type=["png", "jpg", "jpeg", "pdf"]
     )
-    
-    # Inicializa a chave na session_state para controlar o botão
-    if "botao_enviado" not in st.session_state:
-        st.session_state.botao_enviado = False
 
-    # Botão desabilitado após envio
-    enviado = st.form_submit_button(
-        "Reservar ingresso e enviar confirmação",
-        disabled=st.session_state.botao_enviado
-    )
-# Fora do formulário, após o clique:
-if enviado:
-    st.session_state.botao_enviado = True
+    enviado = st.form_submit_button("Reservar ingresso e enviar confirmação")
 
 # === Processamento ===
 if enviado:
