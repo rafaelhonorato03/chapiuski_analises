@@ -169,35 +169,34 @@ with st.form("formulario_ingresso"):
 
 # === Processamento ===
 if enviado:
-    try:
-        # --- Salvar no Supabase ---
-        data = {
-            "email": email,
-            "quantidade": quantidade,
-            "nomes": ', '.join(nomes),
-            "documentos": ', '.join(documentos),
-            "datahora": datetime.now().isoformat(),
-            "lote": lote_atual
-        }
-        resposta = supabase.table("compra_ingressos").insert(data).execute()
+    # --- Validação dos campos ---
+    if (
+        email.strip() == "" or
+        not email_valido(email) or
+        any(nome.strip() == "" for nome in nomes) or
+        any(doc.strip() == "" for doc in documentos) or
+        comprovante is None
+    ):
+        st.warning("Por favor, preencha todos os campos corretamente e envie o comprovante antes de enviar o pedido.")
+    else:
+        try:
+            # --- Salvar no Supabase ---
+            data = {
+                "email": email,
+                "quantidade": quantidade,
+                "nomes": ', '.join(nomes),
+                "documentos": ', '.join(documentos),
+                "datahora": datetime.now().isoformat(),
+                "lote": lote_atual
+            }
+            resposta = supabase.table("compra_ingressos").insert(data).execute()
 
-        if resposta.data:
-            st.success("✅ Pedido salvo no banco de dados com sucesso!")
-        else:
-            st.error("❌ Erro ao salvar no banco de dados.")
+            if resposta.data:
+                st.success("✅ Pedido salvo no banco de dados com sucesso!")
+            else:
+                st.error("❌ Erro ao salvar no banco de dados.")
 
-        # --- Enviar e-mail com Brevo ---
-        if enviado:
-        # --- Validação dos campos ---
-        if (
-            email.strip() == "" or
-            not email_valido(email) or
-            any(nome.strip() == "" for nome in nomes) or
-            any(doc.strip() == "" for doc in documentos) or
-            comprovante is None
-        ):
-            st.warning("Por favor, preencha todos os campos corretamente e envie o comprovante antes de enviar o pedido.")
-        else:
+            # --- Salvar CSV localmente ---
             datahora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             novo_pedido = {
                 'E-mail': email,
@@ -207,7 +206,6 @@ if enviado:
                 'DataHora': datahora
             }
 
-            # --- Salvar CSV ---
             if os.path.exists(arquivo_csv):
                 df = pd.read_csv(arquivo_csv)
                 df = pd.concat([df, pd.DataFrame([novo_pedido])], ignore_index=True)
@@ -216,6 +214,8 @@ if enviado:
             df.to_csv(arquivo_csv, index=False)
 
             st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
+
+            # --- Preparar e enviar e-mail ---
             remetente = os.getenv("EMAIL_REMETENTE")
             senha = os.getenv("EMAIL_SENHA")
             destinatario = os.getenv("EMAIL_DESTINATARIO")
@@ -234,7 +234,7 @@ Quantidade de ingressos: {quantidade}
 Data/Hora do pedido: {datahora}
 
 Participantes:
-""" + "\n".join([f"{i+1}. Nome: {nomes[i]}, Documento: {documentos[i]}" for i in range(int(quantidade))])
+""" + "\n".join([f"{i+1}. Nome: {nomes[i]}, Documento: {documentos[i]}" for i in range(quantidade)])
 
             try:
                 enviar_email(
@@ -249,3 +249,6 @@ Participantes:
                 st.success("Dados enviados por e-mail para a organização!")
             except Exception as e:
                 st.error(f"Erro ao enviar e-mail: {e}")
+
+        except Exception as e:
+            st.error(f"Erro geral no processamento: {e}")
