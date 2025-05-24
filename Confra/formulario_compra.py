@@ -113,7 +113,7 @@ def sincronizar_csv_com_supabase():
         print(f"❌ Erro ao sincronizar CSV com Supabase: {e}")
 
 # === Layout Streamlit ===
-st.title("Compra de Ingressos - Festa Chapiuski 2025")
+st.title("Ingressos - Festa Chapiuski 2025")
 st.subheader(f"Lote atual: {lote_atual}")
 if lote_info:
     st.info(lote_info)
