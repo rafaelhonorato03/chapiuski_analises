@@ -73,7 +73,7 @@ def buscar_total_vendido():
 
 # === Controle de Lotes ===
 estoque_lotes = {
-    "1º LOTE PROMOCIONAL": 36,
+    "1º LOTE PROMOCIONAL": 35,
     "2º LOTE": 65,
 }
 
