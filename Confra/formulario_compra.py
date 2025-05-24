@@ -159,6 +159,9 @@ with st.form("formulario_ingresso"):
             documento = st.text_input(f"Documento do participante #{i+1}", key=f"doc_{i}")
         nomes.append(nome)
         documentos.append(documento)
+    
+    if link_pagamento:
+        st.markdown(f"### 💳 [Clique aqui para pagar seu ingresso]({link_pagamento})")
 
     comprovante = st.file_uploader(
         "Envie o comprovante de pagamento (imagem ou PDF)",
