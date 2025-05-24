@@ -12,7 +12,6 @@ import gspread
 from google.oauth2.service_account import Credentials
 import re
 import json
-import pygsheets
 
 # Carrega variáveis de ambiente
 load_dotenv()
