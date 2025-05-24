@@ -5,3 +5,5 @@ python-dotenv
 gspread
 oauth2client
 supabase
+sib-api-v3-sdk
+
