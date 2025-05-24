@@ -261,10 +261,9 @@ Participantes:
                     arquivo_csv
                 )
                 st.success("Dados enviados por e-mail para a organização!")
+                st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao enviar e-mail: {e}")
 
         except Exception as e:
             st.error(f"Erro geral no processamento: {e}")
-time.sleep(10)
-st.experimental_rerun()
