@@ -1,11 +1,21 @@
 import os
 from datetime import datetime
 import streamlit as st
+import pandas as pd
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from supabase import create_client, Client
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 from pprint import pprint
 from dotenv import load_dotenv
+import gspread
+from google.oauth2.service_account import Credentials
+import re
+import json
 
 # === Carregar Variáveis de Ambiente ===
 load_dotenv()
@@ -17,6 +27,41 @@ EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
 
 # === Inicializar Supabase ===
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+arquivo_csv = os.path.join(os.path.dirname(__file__), "compras_ingressos.csv")
+
+
+def email_valido(email):
+    return re.match(r"[^@]+@[^@]+\.[^@]+", email)
+
+def enviar_email(remetente, senha, destinatarios, assunto, corpo, comprovante, arquivo_csv):
+    msg = MIMEMultipart()
+    msg['Subject'] = assunto
+    msg['From'] = remetente
+    msg['To'] = ", ".join(destinatarios)
+    msg.attach(MIMEText(corpo, 'plain'))
+
+    # Anexa o comprovante
+    if comprovante is not None:
+        part = MIMEBase('application', "octet-stream")
+        file_data = comprovante.getvalue()
+        part.set_payload(file_data)
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f'attachment; filename="{comprovante.name}"')
+        msg.attach(part)
+
+    # Anexa o CSV como backup
+    if os.path.exists(arquivo_csv):
+        with open(arquivo_csv, "rb") as f:
+            part_csv = MIMEBase('application', "octet-stream")
+            part_csv.set_payload(f.read())
+            encoders.encode_base64(part_csv)
+            part_csv.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(arquivo_csv)}"')
+            msg.attach(part_csv)
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        server.login(remetente, senha)
+        server.sendmail(remetente, destinatarios, msg.as_string())
 
 # === Função para buscar total de ingressos vendidos ===
 def buscar_total_vendido():
@@ -59,6 +104,38 @@ if lote_info:
 if estoque_disponivel == 0:
     st.warning("🚫 Ingressos esgotados!")
     st.stop()
+
+# --- Layout ---
+col1, col2, col3 = st.columns([1,2,1])
+with col2:
+    st.image("Confra/chapiuski.jpg", width=800)
+
+st.markdown("""
+**🥩🍻 OPEN FOOD & OPEN BAR!**
+- Churrasco, guarnições, lanches de cupim e costela, chopp, vodka, cachaça, refrigerantes, sucos e água à vontade!
+
+**🎶 ATRAÇÃO IMPERDÍVEL!**
+- Grupo de pagode com o Alemão! Das 17h às 20h30 (com pausa de 30 min)
+
+**⏰ Encerramento: 22h**
+
+**💰 VALORES**
+- 1º LOTE PROMOCIONAL: **RS 100,00 no PIX** ou **RS 105,00 no link** (em até 10x)
+- 2º e 3º LOTE: valores e datas a definir após o término do lote promocional.
+
+**💳 FORMAS DE PAGAMENTO**
+- PIX com desconto: **(11)99499-1465**
+- Débito e Crédito: Link de pagamento (até 10x com taxa)
+
+**⚠️ REGRAS**
+- Crianças até 12 anos não pagam. A partir de 13 anos, pagam integral.
+- Documento com foto obrigatório na entrada.
+- Elevador: uso exclusivo para idosos e PCD.
+- Proibido drogas ilícitas e narguilé.
+- Preencha o site e envie o comprovante para validar sua compra.
+
+🎊 **Garanta já seu ingresso e venha comemorar o 8° ano do Chapiuski!** 🎊
+""")
 
 quantidade = st.number_input(
     "Quantidade de ingressos",
@@ -110,40 +187,65 @@ if enviado:
             st.error("❌ Erro ao salvar no banco de dados.")
 
         # --- Enviar e-mail com Brevo ---
-        configuration = sib_api_v3_sdk.Configuration()
-        configuration.api_key['api-key'] = BREVO_API_KEY
+        if enviado:
+        # --- Validação dos campos ---
+        if (
+            email.strip() == "" or
+            not email_valido(email) or
+            any(nome.strip() == "" for nome in nomes) or
+            any(doc.strip() == "" for doc in documentos) or
+            comprovante is None
+        ):
+            st.warning("Por favor, preencha todos os campos corretamente e envie o comprovante antes de enviar o pedido.")
+        else:
+            datahora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            novo_pedido = {
+                'E-mail': email,
+                'Quantidade': quantidade,
+                'Nomes': ', '.join(nomes),
+                'Documentos': ', '.join(documentos),
+                'DataHora': datahora
+            }
 
-        api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
-            sib_api_v3_sdk.ApiClient(configuration)
-        )
+            # --- Salvar CSV ---
+            if os.path.exists(arquivo_csv):
+                df = pd.read_csv(arquivo_csv)
+                df = pd.concat([df, pd.DataFrame([novo_pedido])], ignore_index=True)
+            else:
+                df = pd.DataFrame([novo_pedido])
+            df.to_csv(arquivo_csv, index=False)
 
-        subject = "Confirmação de Ingresso - Confra Chapiuski"
-        sender = {"name": "Confra Chapiuski", "email": EMAIL_REMETENTE}
-        to = [{"email": email}]
+            st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
+            remetente = os.getenv("EMAIL_REMETENTE")
+            senha = os.getenv("EMAIL_SENHA")
+            destinatario = os.getenv("EMAIL_DESTINATARIO")
 
-        html_content = f"""
-        <h3>🎟️ Seu pedido de ingresso foi recebido!</h3>
-        <p><b>Quantidade:</b> {quantidade}</p>
-        <p><b>Participantes:</b></p>
-        <ul>
-        {''.join([f"<li>{n} - {d}</li>" for n, d in zip(nomes, documentos)])}
-        </ul>
-        <p><b>Lote:</b> {lote_atual}</p>
-        <p><b>Link para pagamento:</b> {link_pagamento}</p>
-        <p>Obrigado por participar da Confra Chapiuski 🎉🍻!</p>
-        """
+            if not remetente or not senha or not destinatario:
+                st.error("❌ Variáveis de ambiente não configuradas corretamente.")
+                st.stop()
 
-        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=to,
-            sender=sender,
-            subject=subject,
-            html_content=html_content
-        )
+            lista_destinatarios = [d.strip() for d in destinatario.split(",")]
 
-        api_response = api_instance.send_transac_email(send_smtp_email)
-        st.success("📧 E-mail enviado com sucesso!")
+            corpo = f"""
+Novo pedido de ingresso:
 
-    except ApiException as e:
-        st.error(f"Erro ao enviar e-mail via Brevo: {e}")
-    except Exception as e:
-        st.error(f"Erro geral: {e}")
+E-mail do responsável: {email}
+Quantidade de ingressos: {quantidade}
+Data/Hora do pedido: {datahora}
+
+Participantes:
+""" + "\n".join([f"{i+1}. Nome: {nomes[i]}, Documento: {documentos[i]}" for i in range(int(quantidade))])
+
+            try:
+                enviar_email(
+                    remetente,
+                    senha,
+                    lista_destinatarios,
+                    "Novo pedido de ingresso",
+                    corpo,
+                    comprovante,
+                    arquivo_csv
+                )
+                st.success("Dados enviados por e-mail para a organização!")
+            except Exception as e:
+                st.error(f"Erro ao enviar e-mail: {e}")
