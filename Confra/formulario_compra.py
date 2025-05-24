@@ -30,9 +30,28 @@ if not CREDENTIALS_JSON:
     st.stop()
 
 try:
-    creds_info = json.loads(CREDENTIALS_JSON)
+    # Tenta escapar novamente os caracteres de nova linha antes de decodificar
+    # Isto pode corrigir o problema se os '\n' estiverem a ser lidos como novas linhas literais
+    st.text(f"Conteúdo bruto recebido: {repr(CREDENTIALS_JSON)}") # Linha de depuração
+    creds_json_escaped = CREDENTIALS_JSON.replace('\n', '\\n')
+    st.text(f"Conteúdo após escape: {repr(creds_json_escaped)}") # Linha de depuração
+    creds_info = json.loads(creds_json_escaped)
+    st.text("JSON decodificado com sucesso após escape!") # Linha de depuração
+
 except json.JSONDecodeError as e:
-    st.error(f"Erro ao decodificar JSON das credenciais: {e}")
+    st.error(f"Erro ao decodificar JSON das credenciais (após tentativa de escape): {e}")
+    # Se ainda falhar, vamos tentar carregar diretamente sem o escape extra
+    try:
+        st.warning("Tentativa de escape falhou. Tentando carregar diretamente...")
+        creds_info = json.loads(CREDENTIALS_JSON)
+        st.text("JSON decodificado com sucesso diretamente!") # Linha de depuração
+    except json.JSONDecodeError as e2:
+        st.error(f"Erro ao decodificar JSON das credenciais (diretamente): {e2}")
+        st.text(f"Conteúdo bruto que falhou: {repr(CREDENTIALS_JSON)}")
+        st.stop()
+except Exception as ex:
+    st.error(f"Ocorreu um erro inesperado ao processar as credenciais: {ex}")
+    st.text(f"Conteúdo bruto no momento do erro: {repr(CREDENTIALS_JSON)}")
     st.stop()
 
 creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
