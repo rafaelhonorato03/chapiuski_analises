@@ -30,7 +30,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 arquivo_csv = os.path.join(os.path.dirname(__file__), "compras_ingressos.csv")
 
-
 def email_valido(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
@@ -95,6 +94,23 @@ else:
     estoque_disponivel = 0
     lote_info = ""
 
+# === Função para sincronizar o CSV com o Supabase ===
+def sincronizar_csv_com_supabase():
+    try:
+        response = supabase.table("compra_ingressos").select("*").execute()
+        if response.data:
+            df = pd.DataFrame(response.data)
+            df.to_csv(arquivo_csv, index=False, encoding="utf-8")
+            print("✅ CSV sincronizado com o Supabase.")
+        else:
+            # Se não houver dados, cria um CSV vazio com as colunas padrão
+            colunas = ["email", "quantidade", "nomes", "documentos", "datahora", "lote"]
+            df = pd.DataFrame(columns=colunas)
+            df.to_csv(arquivo_csv, index=False, encoding="utf-8")
+            print("⚠️ CSV criado vazio, sem dados no Supabase.")
+    except Exception as e:
+        print(f"❌ Erro ao sincronizar CSV com Supabase: {e}")
+
 # === Layout Streamlit ===
 st.title("Compra de Ingressos - Confra Chapiuski 2025")
 st.subheader(f"Lote atual: {lote_atual}")
@@ -125,7 +141,7 @@ st.markdown("""
 
 **💳 FORMAS DE PAGAMENTO**
 - PIX com desconto: **(11)99499-1465**
-- Débito e Crédito: Link de pagamento (até 10x com taxa)
+- Débito e Crédito: Link de pagamento abaixo (até 10x com taxa)
 
 **⚠️ REGRAS**
 - Crianças até 12 anos não pagam. A partir de 13 anos, pagam integral.
@@ -199,15 +215,8 @@ if enviado:
             else:
                 st.error("❌ Erro ao salvar no banco de dados.")
 
-            # --- Salvar CSV localmente ---
-            datahora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            novo_pedido = {
-                'E-mail': email,
-                'Quantidade': quantidade,
-                'Nomes': ', '.join(nomes),
-                'Documentos': ', '.join(documentos),
-                'DataHora': datahora
-            }
+            # --- Sincronizar CSV com Supabase ---
+            sincronizar_csv_com_supabase()
 
             if os.path.exists(arquivo_csv):
                 df = pd.read_csv(arquivo_csv)
