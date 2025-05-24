@@ -4,6 +4,7 @@ import streamlit as st
 from supabase import create_client, Client
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
+from pprint import pprint
 from dotenv import load_dotenv
 
 # === Carregar Variáveis de Ambiente ===
