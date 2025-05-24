@@ -29,12 +29,69 @@ if not CREDENTIALS_JSON:
     st.error("Variável de ambiente GOOGLE_SHEETS_CREDENTIALS não encontrada!")
     st.stop()
 
-try:
-    creds_info = json.loads(CREDENTIALS_JSON)
-except json.JSONDecodeError as e:
-    st.error(f"Erro ao decodificar JSON das credenciais: {e}")
-    st.text(f"Conteúdo bruto que falhou: {repr(CREDENTIALS_JSON)}") # Manter esta linha de depuração por agora
+import re # Certifique-se que 'import re' está no topo do seu script
+# ... outras importações
+
+CREDENTIALS_JSON_RAW = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
+
+if not CREDENTIALS_JSON_RAW:
+    st.error("Variável de ambiente GOOGLE_SHEETS_CREDENTIALS não encontrada!")
     st.stop()
+
+st.text(f"Conteúdo bruto recebido: {repr(CREDENTIALS_JSON_RAW)}") # Linha de depuração
+
+try:
+    # Tentativa 1: Tentar carregar diretamente (pode funcionar em alguns casos)
+    try:
+        creds_info = json.loads(CREDENTIALS_JSON_RAW)
+        st.success("JSON decodificado diretamente com sucesso!") # Linha de depuração
+    except json.JSONDecodeError as e1:
+        st.warning(f"Falha ao carregar diretamente: {e1}. Tentando normalizar a private_key...")
+
+        # Tentativa 2: Normalizar novas linhas APENAS dentro do valor da private_key
+        # Esta função auxiliar substitui \n por \\n dentro do conteúdo da chave privada
+        def escape_newlines_in_key(match):
+            key_content = match.group(1)
+            # Substitui a nova linha literal por uma nova linha escapada para JSON
+            escaped_content = key_content.replace('\n', '\\n') 
+            return f'"private_key": "{escaped_content}"'
+
+        # Regex para encontrar "private_key": "-----BEGIN ... -----END PRIVATE KEY-----\n"
+        # Captura o conteúdo entre as aspas. re.DOTALL permite que '.' corresponda a novas linhas.
+        pattern = r'"private_key":\s*"((?:-----BEGIN PRIVATE KEY-----(?:.|\n)*?-----END PRIVATE KEY-----))"'
+        
+        # Verifica se o padrão é encontrado antes de tentar substituir
+        if re.search(pattern, CREDENTIALS_JSON_RAW, re.DOTALL):
+             # Aplica a substituição usando a função auxiliar
+             creds_json_normalized = re.sub(pattern, escape_newlines_in_key, CREDENTIALS_JSON_RAW, count=1, flags=re.DOTALL)
+             st.text(f"Conteúdo após normalização da chave: {repr(creds_json_normalized)}") # Linha de depuração
+             try:
+                 # Tenta carregar o JSON com a chave privada normalizada
+                 creds_info = json.loads(creds_json_normalized)
+                 st.success("JSON decodificado com sucesso após normalização da chave!") # Linha de depuração
+             except json.JSONDecodeError as e2:
+                 st.error(f"Erro ao decodificar JSON após normalização da chave: {e2}")
+                 st.text(f"Conteúdo normalizado que falhou: {repr(creds_json_normalized)}")
+                 st.stop()
+        else:
+             # Se o padrão da chave privada não for encontrado (improvável, mas seguro verificar)
+             st.error("Não foi possível encontrar o padrão 'private_key' no JSON para normalização.")
+             st.text(f"Conteúdo bruto que falhou na busca do padrão: {repr(CREDENTIALS_JSON_RAW)}")
+             st.stop()
+
+except Exception as ex:
+    # Captura outros erros inesperados durante o processo
+    st.error(f"Ocorreu um erro inesperado ao processar as credenciais: {ex}")
+    st.text(f"Conteúdo bruto no momento do erro: {repr(CREDENTIALS_JSON_RAW)}")
+    st.stop()
+
+# --- Continue com o resto do seu script usando creds_info ---
+# Exemplo:
+# creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+# gc = gspread.authorize(creds)
+# ...
+
+# Lembre-se de remover as linhas st.text de depuração quando confirmar que funciona.
 
 creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
 gc = gspread.authorize(creds)
