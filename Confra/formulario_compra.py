@@ -162,6 +162,9 @@ quantidade = st.number_input(
     step=1
 )
 
+if "botao_enviado" not in st.session_state:
+    st.session_state.botao_enviado = False
+
 # === Formulário ===
 with st.form("formulario_ingresso"):
     email = st.text_input("E-mail para contato")
@@ -185,7 +188,13 @@ with st.form("formulario_ingresso"):
         type=["png", "jpg", "jpeg", "pdf"]
     )
 
-    enviado = st.form_submit_button("Reservar ingresso e enviar confirmação")
+    enviado = st.form_submit_button("Reservar ingresso e enviar confirmação",
+                                    disabled=st.session_state.botao_enviado)
+
+# Processa o envio depois do formulário
+if enviado and not st.session_state.botao_enviado:
+    # Bloqueia o botão para não deixar enviar duas vezes
+    st.session_state.botao_enviado = True
 
 # === Processamento ===
 if enviado:
