@@ -20,7 +20,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # === Função para buscar total de ingressos vendidos ===
 def buscar_total_vendido():
-    response = supabase.table("compras_ingressos").select("quantidade").execute()
+    response = supabase.table("compra_ingressos").select("quantidade").execute()
     if response.data:
         total = sum(item["quantidade"] for item in response.data)
         return total
@@ -102,7 +102,7 @@ if enviado:
             "datahora": datetime.now().isoformat(),
             "lote": lote_atual
         }
-        resposta = supabase.table("compras_ingressos").insert(data).execute()
+        resposta = supabase.table("compra_ingressos").insert(data).execute()
 
         if resposta.data:
             st.success("✅ Pedido salvo no banco de dados com sucesso!")
