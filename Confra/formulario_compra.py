@@ -16,6 +16,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import re
 import json
+import time
 
 # === Carregar Variáveis de Ambiente ===
 load_dotenv()
@@ -200,6 +201,7 @@ if enviado:
     else:
         try:
             # --- Salvar no Supabase ---
+            datahora = datetime.now().isoformat()
             data = {
                 "email": email,
                 "quantidade": quantidade,
@@ -220,9 +222,9 @@ if enviado:
 
             if os.path.exists(arquivo_csv):
                 df = pd.read_csv(arquivo_csv)
-                df = pd.concat([df, pd.DataFrame([novo_pedido])], ignore_index=True)
+                df = pd.concat([df, pd.DataFrame([data])], ignore_index=True)
             else:
-                df = pd.DataFrame([novo_pedido])
+                df = pd.DataFrame([data])
             df.to_csv(arquivo_csv, index=False)
 
             st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
@@ -264,3 +266,5 @@ Participantes:
 
         except Exception as e:
             st.error(f"Erro geral no processamento: {e}")
+time.sleep(10)
+st.experimental_rerun()
