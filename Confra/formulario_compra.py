@@ -145,11 +145,14 @@ st.markdown("""
 - Débito e Crédito: Link de pagamento abaixo (até 10x com taxa)
 
 **⚠️ REGRAS**
-- Crianças até 12 anos não pagam. A partir de 13 anos, pagam integral.
+- 👧👦 Crianças até 12 anos não pagam, mas é obrigatório enviar os dados da criança (nome completo e documento) para o WhatsApp (11) 99499-1465 para liberação da entrada.
+- A partir de 13 anos, pagam valor integral.
 - Documento com foto obrigatório na entrada.
 - Elevador: uso exclusivo para idosos e PCD.
 - Proibido drogas ilícitas e narguilé.
 - Preencha o site e envie o comprovante para validar sua compra.
+
+⚠️ Atenção: Compras realizadas não poderão ser canceladas nem reembolsadas.
 
 🎊 **Garanta já seu ingresso e venha comemorar o 8° ano do Chapiuski!** 🎊
 """)
