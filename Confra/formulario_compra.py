@@ -8,15 +8,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from supabase import create_client, Client
-import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 from pprint import pprint
 from dotenv import load_dotenv
-import gspread
 from google.oauth2.service_account import Credentials
 import re
-import json
-import time
 
 # === Carregar Variáveis de Ambiente ===
 load_dotenv()
