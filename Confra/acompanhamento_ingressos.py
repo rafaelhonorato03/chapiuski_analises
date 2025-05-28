@@ -1,33 +1,46 @@
-from dotenv import load_dotenv
-from google.oauth2.service_account import Credentials
-import gspread
 import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
+import pandas as pd
+import streamlit as st
+import plotly.express as px
 
 load_dotenv()
 
-SCOPES = [
-    'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive'
-]
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-CREDENTIALS = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
-sheet_id = os.getenv("GOOGLE_SHEET_ID")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-if not CREDENTIALS:
-    raise Exception("Variável de ambiente 'GOOGLE_SHEETS_CREDENTIALS' não encontrada!")
+st.set_page_config(page_title="Acompanhamento de Ingressos", layout = "wide")
 
-if not os.path.isfile(CREDENTIALS):
-    raise FileNotFoundError(f"Arquivo de credenciais não encontrado: {CREDENTIALS}")
+st.title("🎟️Acompanhamento de Ingressos Festa Chapiuski 8 anos")
 
-creds = Credentials.from_service_account_file(CREDENTIALS, scopes=SCOPES)
-gc = gspread.authorize(creds)
+data = supabase.table('compra_ingressos').select('*').execute()
 
-spreadsheet = gc.open_by_key(sheet_id)
+if data.data:
+    df = pd.DataFrame(data.data)
 
-print(spreadsheet.worksheets())
+    st.subheader("Prévia dos dados")
+    st.dataframe(df)
 
-worksheet = spreadsheet.sheet1  # ou spreadsheet.worksheet('Página1')
-data = worksheet.get_all_values()  # método do Worksheet, não do Spreadsheet
+    df['datahora'] = pd.to_datetime(df['datahora'])
 
-for row in data:
-    print(row)
+    ingresso_por_data = df.groupby(df['datahora'].dt.date).size().reset_index()
+
+    fig = px.bar(ingresso_por_data,
+                 x = 'datahora',
+                 y = 'quantidade',
+                 title = 'Ingressos vendidos por data',
+                 labels = {'datahora': 'Data',
+                 'quantidade': 'Quantidade de Ingressos'},
+                 text_auto = True)
+    
+    st.plotly_chart(fig, use_container_width = True)
+
+    st.subheader("Detalhes por data")
+    st.dataframe(ingresso_por_data)
+
+else:
+    st.warning("Nenhum dado encontrado na tabela.")
+    
