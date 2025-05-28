@@ -26,7 +26,7 @@ if data.data:
 
     df['datahora'] = pd.to_datetime(df['datahora'])
 
-    ingresso_por_data = df.groupby(df['datahora'].dt.date).size().reset_index()
+    ingresso_por_data = df.groupby(df['datahora'].dt.date).size().reset_index(name='quantidade')
 
     fig = px.bar(ingresso_por_data,
                  x = 'datahora',
