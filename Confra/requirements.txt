@@ -6,3 +6,12 @@ gspread
 oauth2client
 supabase
 sib-api-v3-sdk
+scikit-learn
+prophet
+numpy
+matplotlib
+seaborn
+statsmodels
+tensorflow
+keras
+plotly
