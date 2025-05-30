@@ -9,8 +9,10 @@ from math import pi
 from collections import Counter
 from itertools import combinations
 
+dados_chap: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQqKawlrhvZxCUepOzcl4jG9ejActoqNd11Hs6hDverwxV0gv9PRYjwVxs6coMWsoopfH41EuSLRN-v/pub?output=csv"
+
 # --- CARREGAMENTO E PREPARAÇÃO DOS DADOS ---
-df = pd.read_excel('Chapiuski Dados.xlsx')
+df = pd.read_csv(dados_chap)
 df['Data'] = pd.to_datetime(df['Data'])
 df['Semana'] = df['Data'].dt.isocalendar().week
 df['Jogador'] = df['Jogador'].str.strip()
