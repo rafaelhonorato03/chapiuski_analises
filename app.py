@@ -5,6 +5,7 @@ import os
 os.environ['MPLCONFIGDIR'] = os.getcwd()
 import matplotlib
 matplotlib.use('Agg')
+matplotlib.rcParams['backend'] = 'Agg'
 import matplotlib.pyplot as plt
 import seaborn as sns
 import networkx as nx
