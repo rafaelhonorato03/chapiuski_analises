@@ -14,8 +14,6 @@ from datetime import timedelta
 from math import pi
 from collections import Counter
 from itertools import combinations
-import plotly.express as px
-import plotly.graph_objects as go
 
 # Configuração do matplotlib
 plt.style.use('default')
@@ -51,9 +49,31 @@ def criar_grafico_evolucao(df, jogadores, coluna):
         
         dados_acumulados = pd.concat([dados_acumulados, dados_jogador])
     
-    fig = px.line(dados_acumulados, x='Data', y=f'{coluna}_Acumulado', color='Jogador',
-                  title=f'Evolução de {coluna}s Acumulados')
-    st.plotly_chart(fig)
+    plt.figure(figsize=(12, 6))
+    sns.set_style("whitegrid")
+    
+    # Criar o gráfico de linhas com seaborn
+    ax = sns.lineplot(data=dados_acumulados, 
+                     x='Data', 
+                     y=f'{coluna}_Acumulado', 
+                     hue='Jogador',
+                     linewidth=2.5,
+                     marker='o')
+    
+    # Personalizar o gráfico
+    plt.title(f'Evolução de {coluna}s Acumulados', pad=20, size=14)
+    plt.xlabel('Data')
+    plt.ylabel(f'Total de {coluna}s')
+    
+    # Rotacionar labels do eixo x para melhor legibilidade
+    plt.xticks(rotation=45)
+    
+    # Ajustar o layout
+    plt.tight_layout()
+    
+    # Mostrar o gráfico
+    st.pyplot(plt.gcf())
+    plt.close()
 
 def criar_rede_entrosamento(df, coluna, titulo):
     top_7_frequentes = df['Jogador'].value_counts().head(7).index.tolist()
@@ -78,62 +98,50 @@ def criar_rede_entrosamento(df, coluna, titulo):
         st.info(f"Nenhuma conexão encontrada para {titulo}")
         return
     
-    pos = nx.spring_layout(G, seed=42)
+    # Criar figura com tamanho adequado e definir os axes
+    fig, ax = plt.subplots(figsize=(12, 8))
     
-    edge_x = []
-    edge_y = []
-    edge_weights = []
-    for edge in G.edges(data=True):
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-        edge_x.extend([x0, x1, None])
-        edge_y.extend([y0, y1, None])
-        edge_weights.append(edge[2]['weight'])
+    # Definir o layout da rede
+    pos = nx.spring_layout(G, k=1, iterations=50)
     
-    node_x = []
-    node_y = []
-    node_text = []
-    for node in G.nodes():
-        x, y = pos[node]
-        node_x.append(x)
-        node_y.append(y)
-        node_text.append(node)
+    # Obter os pesos das arestas para definir suas larguras
+    edge_weights = [G[u][v]['weight'] for u, v in G.edges()]
     
-    edge_trace = go.Scatter(
-        x=edge_x, y=edge_y,
-        line=dict(width=1, color='#888'),
-        hoverinfo='none',
-        mode='lines')
+    # Normalizar os pesos para larguras visualmente apropriadas
+    max_width = 10
+    edge_widths = [max_width * w / max(edge_weights) for w in edge_weights]
     
-    node_trace = go.Scatter(
-        x=node_x, y=node_y,
-        mode='markers+text',
-        hoverinfo='text',
-        text=node_text,
-        textposition="top center",
-        marker=dict(
-            showscale=True,
-            colorscale='YlGnBu',
-            size=30,
-            colorbar=dict(
-                thickness=15,
-                title='Conexões',
-                xanchor='left',
-                titleside='right'
-            )
-        ))
+    # Desenhar as arestas
+    nx.draw_networkx_edges(G, pos, width=edge_widths, alpha=0.5, edge_color='gray', ax=ax)
     
-    fig = go.Figure(data=[edge_trace, node_trace],
-                   layout=go.Layout(
-                       title=titulo,
-                       showlegend=False,
-                       hovermode='closest',
-                       margin=dict(b=20,l=5,r=5,t=40),
-                       xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                       yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
-                   )
+    # Calcular o peso total de cada nó (soma dos pesos de todas as suas conexões)
+    node_weights = [sum(G[node][neighbor]['weight'] for neighbor in G[node]) for node in G.nodes()]
     
-    st.plotly_chart(fig)
+    # Desenhar os nós
+    node_sizes = [3000 * G.degree(node) for node in G.nodes()]
+    nodes = nx.draw_networkx_nodes(G, pos, 
+                                 node_size=node_sizes,
+                                 node_color=node_weights,
+                                 cmap=plt.cm.YlOrRd,
+                                 alpha=0.7,
+                                 ax=ax)
+    
+    # Adicionar labels aos nós
+    nx.draw_networkx_labels(G, pos, font_size=10, font_weight='bold', ax=ax)
+    
+    # Adicionar colorbar
+    plt.colorbar(nodes, ax=ax, label='Força Total das Conexões')
+    
+    # Configurar o título e remover eixos
+    ax.set_title(titulo, pad=20, size=14)
+    ax.axis('off')
+    
+    # Ajustar o layout
+    plt.tight_layout()
+    
+    # Mostrar o gráfico
+    st.pyplot(fig)
+    plt.close()
 
 def criar_radar(df, jogadores, titulo):
     metricas = []
@@ -170,29 +178,40 @@ def criar_radar(df, jogadores, titulo):
         if max_val > 0:
             df_norm[col] = df_metricas[col] / max_val
     
-    fig = go.Figure()
+    # Número de variáveis
+    num_vars = len(colunas_norm)
+    
+    # Calcular os ângulos para cada eixo
+    angles = [n / float(num_vars) * 2 * pi for n in range(num_vars)]
+    angles += angles[:1]
+    
+    # Criar a figura
+    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(projection='polar'))
+    
+    # Plotar os dados para cada jogador
     for idx, jogador in enumerate(df_norm['Jogador']):
         valores = df_norm.loc[df_norm['Jogador'] == jogador, colunas_norm].values.flatten()
         valores = np.append(valores, valores[0])
         
-        fig.add_trace(go.Scatterpolar(
-            r=valores,
-            theta=colunas_norm + [colunas_norm[0]],
-            name=jogador,
-            fill='toself'
-        ))
+        # Plotar os dados
+        ax.plot(angles, valores, linewidth=2, linestyle='solid', label=jogador)
+        ax.fill(angles, valores, alpha=0.1)
     
-    fig.update_layout(
-        polar=dict(
-            radialaxis=dict(
-                visible=True,
-                range=[0, 1]
-            )),
-        showlegend=True,
-        title=titulo
-    )
+    # Configurar os eixos
+    ax.set_theta_offset(pi / 2)
+    ax.set_theta_direction(-1)
     
-    st.plotly_chart(fig)
+    # Definir os labels
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(colunas_norm)
+    
+    # Adicionar título e legenda
+    plt.title(titulo, y=1.05, size=14)
+    plt.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
+    
+    # Mostrar o gráfico
+    st.pyplot(plt.gcf())
+    plt.close()
 
 def calcular_vitorias(df):
     df = df.copy()
@@ -208,30 +227,30 @@ def analisar_momento(df, jogador, coluna, titulo, cor):
     dados_jogador[coluna] = dados_jogador[coluna].fillna(0)
     dados_jogador['Media_Movel'] = dados_jogador[coluna].rolling(window=4, min_periods=1).mean()
     
-    fig = go.Figure()
+    # Criar figura e axes
+    fig, ax = plt.subplots(figsize=(10, 6))
     
-    fig.add_trace(go.Scatter(
-        x=dados_jogador['Data'],
-        y=dados_jogador[coluna],
-        mode='lines+markers',
-        name='Por Jogo',
-        line=dict(color=cor)
-    ))
+    # Plotar linha com marcadores para valores por jogo
+    ax.plot(dados_jogador['Data'], dados_jogador[coluna], 
+            marker='o', linestyle='-', color=cor, 
+            label='Por Jogo', alpha=0.7)
     
-    fig.add_trace(go.Scatter(
-        x=dados_jogador['Data'],
-        y=dados_jogador['Media_Movel'],
-        mode='lines',
-        name='Média Móvel (4 jogos)',
-        line=dict(color='red', dash='dash')
-    ))
+    # Plotar linha da média móvel
+    ax.plot(dados_jogador['Data'], dados_jogador['Media_Movel'], 
+            color='red', linestyle='--', 
+            label='Média Móvel (4 jogos)', alpha=0.8)
     
-    fig.update_layout(
-        title=f'{jogador} - {titulo}',
-        xaxis_title='Data do Jogo',
-        yaxis_title='Quantidade',
-        showlegend=True
-    )
+    # Configurar o gráfico
+    ax.set_title(f'{jogador} - {titulo}', pad=20, size=14)
+    ax.set_xlabel('Data do Jogo')
+    ax.set_ylabel('Quantidade')
+    ax.legend()
+    
+    # Rotacionar labels do eixo x para melhor legibilidade
+    plt.xticks(rotation=45)
+    
+    # Ajustar o layout
+    plt.tight_layout()
     
     ultimos_4 = dados_jogador[coluna].tail(4).mean()
     media_geral = dados_jogador[coluna].mean()
@@ -247,7 +266,8 @@ def analisar_momento(df, jogador, coluna, titulo, cor):
     ultimos_4_datas = dados_jogador['Data'].tail(4).dt.strftime('%d/%m').tolist()
     
     col1, col2 = st.columns(2)
-    col1.plotly_chart(fig)
+    col1.pyplot(fig)
+    plt.close()
     
     metrica = "gols" if coluna == 'Gol' else "assistências" if coluna == 'Assistência' else "vitórias"
     
