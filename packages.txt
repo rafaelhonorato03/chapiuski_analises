@@ -1,11 +1,5 @@
-python3-tk
 python3-dev
 libfreetype6-dev
 libpng-dev
-libffi-dev
 libjpeg-dev
-zlib1g-dev
-build-essential
-python3-setuptools
-python3-wheel
-python3-cffi 
+zlib1g-dev 
