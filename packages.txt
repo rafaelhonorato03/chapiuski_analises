@@ -1,0 +1,5 @@
+python3-tk
+python3-dev
+libfreetype6-dev
+libpng-dev
+libffi-dev 
