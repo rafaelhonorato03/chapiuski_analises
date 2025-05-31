@@ -15,6 +15,10 @@ from math import pi
 from collections import Counter
 from itertools import combinations
 
+# Configuração do matplotlib
+plt.style.use('default')
+sns.set_style('whitegrid')
+
 dados_chap = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQqKawlrhvZxCUepOzcl4jG9ejActoqNd11Hs6hDverwxV0gv9PRYjwVxs6coMWsoopfH41EuSLRN-v/pub?output=csv"
 
 # --- FUNÇÕES AUXILIARES ---
