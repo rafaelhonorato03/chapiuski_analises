@@ -73,10 +73,19 @@ estoque_lotes = {
     "2º LOTE": 65,
 }
 
-total_vendidos = 66
-#total_vendidos = buscar_total_vendido()
+# Verificar se já passou das 22h50 de hoje
+data_atual = datetime.now()
+data_limite = data_atual.replace(hour=22, minute=50, second=0, microsecond=0)
 
-if total_vendidos < estoque_lotes["1º LOTE PROMOCIONAL"]:
+total_vendidos = buscar_total_vendido()
+
+# Se já passou das 22h50 de hoje, ingressos esgotados
+if data_atual >= data_limite:
+    lote_atual = "Ingressos esgotados"
+    link_pagamento = None
+    estoque_disponivel = 0
+    lote_info = ""
+elif total_vendidos < estoque_lotes["1º LOTE PROMOCIONAL"]:
     lote_atual = "1º LOTE PROMOCIONAL"
     link_pagamento = "https://pag.ae/7_FMHdgNJ"
     estoque_disponivel = estoque_lotes["1º LOTE PROMOCIONAL"] - total_vendidos
@@ -135,7 +144,7 @@ st.markdown("""
 
 **💰 VALORES**
 - 1º LOTE PROMOCIONAL: **R&#36; 100,00 no PIX** ou **R&#36; 105,00 no link** (em até 10x)
-- 2º e 3º LOTE: valores e datas a definir após o término do lote promocional.
+- 2º LOTE: **R&#36; 120,00 no PIX** ou **R&#36; 125,00 no link** (em até 10x)
 
 **💳 FORMAS DE PAGAMENTO**
 - PIX com desconto: **(11)99499-1465**
