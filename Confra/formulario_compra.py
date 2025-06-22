@@ -73,7 +73,8 @@ estoque_lotes = {
     "2º LOTE": 65,
 }
 
-total_vendidos = buscar_total_vendido()
+total_vendidos = 66
+#total_vendidos = buscar_total_vendido()
 
 if total_vendidos < estoque_lotes["1º LOTE PROMOCIONAL"]:
     lote_atual = "1º LOTE PROMOCIONAL"
