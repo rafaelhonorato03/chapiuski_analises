@@ -73,33 +73,29 @@ estoque_lotes = {
     "2º LOTE": 65,
 }
 
-# Verificar se já passou das 22h50 de hoje
-data_atual = datetime.now()
-data_limite = data_atual.replace(hour=22, minute=50, second=0, microsecond=0)
-
 total_vendidos = buscar_total_vendido()
 
-# Se já passou das 22h50 de hoje, ingressos esgotados
-if data_atual >= data_limite:
-    lote_atual = "Ingressos esgotados"
-    link_pagamento = None
-    estoque_disponivel = 0
-    lote_info = ""
-elif total_vendidos < estoque_lotes["1º LOTE PROMOCIONAL"]:
-    lote_atual = "1º LOTE PROMOCIONAL"
-    link_pagamento = "https://pag.ae/7_FMHdgNJ"
-    estoque_disponivel = estoque_lotes["1º LOTE PROMOCIONAL"] - total_vendidos
-    lote_info = "R&#36; 100,00 no PIX ou R&#36; 105,00 no link (até 10x)"
-elif total_vendidos < (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]):
-    lote_atual = "2º LOTE"
-    link_pagamento = "https://pag.ae/7_FMKBcQs"
-    estoque_disponivel = (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]) - total_vendidos
-    lote_info = "R&#36; 120,00 no PIX ou R&#36; 125,00 no link (até 10x)"
-else:
-    lote_atual = "Ingressos esgotados"
-    link_pagamento = None
-    estoque_disponivel = 0
-    lote_info = ""
+#if total_vendidos < estoque_lotes["1º LOTE PROMOCIONAL"]:
+    #lote_atual = "1º LOTE PROMOCIONAL"
+    #link_pagamento = "https://pag.ae/7_FMHdgNJ"
+    #estoque_disponivel = estoque_lotes["1º LOTE PROMOCIONAL"] - total_vendidos
+    #lote_info = "R&#36; 100,00 no PIX ou R&#36; 105,00 no link (até 10x)"
+#elif total_vendidos < (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]):
+    #lote_atual = "2º LOTE"
+    #link_pagamento = "https://pag.ae/7_FMKBcQs"
+    #estoque_disponivel = (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]) - total_vendidos
+    #lote_info = "R&#36; 120,00 no PIX ou R&#36; 125,00 no link (até 10x)"
+#else:
+    #lote_atual = "Ingressos esgotados"
+    #link_pagamento = None
+    #estoque_disponivel = 0
+    #lote_info = ""
+
+# Ingressos esgotados
+lote_atual = "Ingressos esgotados"
+link_pagamento = None
+estoque_disponivel = 0
+lote_info = ""
 
 # === Função para sincronizar o CSV com o Supabase ===
 def sincronizar_csv_com_supabase():
