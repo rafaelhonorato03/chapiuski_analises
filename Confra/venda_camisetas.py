@@ -1,192 +1,208 @@
-# app.py
 import os
 import re
-import uuid
-from datetime import datetime
+import smtplib
+import time
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email import encoders
 
 import streamlit as st
 import pandas as pd
-import mercadopago
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-# ---------- CONFIG ----------
-load_dotenv()  # local dev: use .env; em produção prefira secrets
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-MERCADO_PAGO_ACCESS_TOKEN = os.getenv("MERCADO_PAGO_ACCESS_TOKEN")
-# BASE_URL must be the public HTTPS URL where your app (and ideally webhook) is reachable
-BASE_URL = os.getenv("BASE_URL")  # ex: "https://meu-app.streamlit.app" or your webhook host
-
-# validações básicas de ambiente
-if not all([SUPABASE_URL, SUPABASE_KEY, MERCADO_PAGO_ACCESS_TOKEN]):
-    st.error("Faltam variáveis de ambiente: SUPABASE_URL, SUPABASE_KEY ou MERCADO_PAGO_ACCESS_TOKEN.")
-    st.stop()
-
-if not BASE_URL:
-    st.warning("BASE_URL não configurada. Para pagamentos em produção você precisa informar a URL pública do app/webhook (BASE_URL).")
-
-# clientes
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-sdk = mercadopago.SDK(MERCADO_PAGO_ACCESS_TOKEN)
-
-# ---------- NEGÓCIO ----------
-PRECOS = {"Jogador": 150.00, "Torcedor": 115.00}
-JOGADORES_FIXOS = {1: "Renan G", 2: "Renato", 3: "Arthur Garcia", 4: "Rafa Crispim", 6: "Kelvim", 7: "Kenneth",
-                   8: "Hassan", 9: "Marquezini", 10: "Biel", 11: "Dembele", 12: "Tuaf", 13: "Kauan", 14: "Marrone",
-                   17: "João Pedro", 19: "Léo Leite", 20: "Arthur", 21: "Yago", 22: "Zanardo", 23: "Rafa Castilho",
-                   28: "Vini Castilho", 29: "Dani R", 35: "Brisa", 43: "Allan", 44: "Felipinho", 71: "Tutão",
-                   80: "Gabriel Baby", 89: "Dody", 91: "Vitão", 98: "Askov", 99: "Isaías"}
-
-# ---------- UI ----------
-st.set_page_config(page_title="Venda de Camisas 2025 - Chapiuski", page_icon="👕", layout="centered")
-st.image("Confra/chapiuski.jpg")
-st.title("👕 Venda de Camisas 2025")
-st.markdown("---")
-
-st.subheader("Regras para Personalização")
-st.info(
-    """
-    - **Camisa Jogador (R$ 150,00):** Alguns números já são usados por jogadores (veja a lista). Você pode escolher, mas não será exclusivo.
-    - **Camisa Torcedor (R$ 115,00):** Pode escolher qualquer nome e número.
-    """
+# ==== Configuração da Página (DEVE SER O PRIMEIRO COMANDO STREAMLIT) ====
+st.set_page_config(
+    layout="centered",
+    page_title="Venda de Camisas",
+    page_icon="👕"
 )
 
-with st.expander("Ver lista de jogadores com número fixo"):
-    df_jogadores = pd.DataFrame(JOGADORES_FIXOS.items(), columns=['Número', 'Jogador'])
-    st.table(df_jogadores.set_index('Número'))
+# ==== Configurações Iniciais e Variáveis de Ambiente ====
+load_dotenv()
 
-# ---------- helpers ----------
-def validar_email(email: str) -> bool:
-    if not email:
-        return False
-    return re.match(r"[^@]+@[^@]+\.[^@]+", email) is not None
+# Conexão com o Supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def criar_preferencia_pagamento(itens_pedido: list, id_externo: str):
-    """
-    Cria preferência no Mercado Pago e retorna init_point (URL do checkout).
-    É recomendado também configurar notification_url (webhook) no painel ou aqui.
-    """
-    if not BASE_URL:
-        st.warning("BASE_URL não definida. O fluxo de retorno e webhook podem não funcionar corretamente.")
-    preference_data = {
-        "items": itens_pedido,
-        "back_urls": {
-            "success": f"{BASE_URL}?mp_status=success&id={id_externo}",
-            "failure": f"{BASE_URL}?mp_status=failure&id={id_externo}",
-            "pending": f"{BASE_URL}?mp_status=pending&id={id_externo}"
-        },
-        "auto_return": "approved",
-        # pede ao Mercado Pago para notificar seu webhook (substitua /webhook/mp pelo endpoint público que você usar)
-        "notification_url": f"{BASE_URL}/webhook/mp" if BASE_URL else None,
-        "external_reference": id_externo
-    }
-    try:
-        response = sdk.preference().create(preference_data)
-        # a estrutura retornada costuma ser {"status":200, "response": {...}}
-        init_point = response.get("response", {}).get("init_point")
-        return init_point
-    except Exception as e:
-        st.error(f"Erro ao criar preferência Mercado Pago: {e}")
-        return None
+# Configurações de E-mail
+EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
+EMAIL_SENHA = os.getenv("EMAIL_SENHA")
+EMAIL_DESTINATARIO = os.getenv("EMAIL_DESTINATARIO")
 
-# ---------- FORM ----------
-with st.form("form_compra"):
-    st.subheader("Monte seu Pedido")
+# ==== Constantes do Aplicativo ====
+JOGADORES_FIXOS = {
+    1: "Renan G", 2: "Renato", 3: "Arthur Garcia", 4: "Rafa Crispim", 6: "Kelvim", 7: "Kenneth",
+    8: "Hassan", 9: "Marquezini", 10: "Biel", 11: "Dembele", 12: "Tuaf", 13: "Kauan", 14: "Marrone",
+    17: "João Pedro", 19: "Léo Leite", 20: "Arthur", 21: "Yago", 22: "Zanardo", 23: "Rafa Castilho",
+    28: "Vini Castilho", 29: "Dani R", 35: "Brisa", 43: "Allan", 44: "Felipinho", 71: "Tutão",
+    80: "Gabriel Baby", 89: "Dody", 91: "Vitão", 98: "Askov", 99: "Isaías"
+}
+
+LINKS_PAGAMENTO = {
+    "1 Camisa Jogador": "https://link_pagamento_jogador",
+    "1 Camisa Jogador + 1 Camisa Torcedor": "https://link_pagamento_jogador_torcedor",
+    "1 Camisa Torcedor": "https://link_pagamento_torcedor",
+    "2 Camisas Torcedor": "https://link_pagamento_dois_torcedores"
+}
+
+# ==== Funções Auxiliares ====
+def email_valido(email):
+    if email:
+        return re.match(r"[^@]+@[^@]+\.[^@]+", email)
+    return False
+
+def enviar_email_confirmacao(remetente, senha, destinatarios, assunto, corpo, comprovante, caminho_csv=None):
+    msg = MIMEMultipart()
+    msg['Subject'] = assunto
+    msg['From'] = remetente
+    msg['To'] = ", ".join(destinatarios)
+    msg.attach(MIMEText(corpo, 'plain'))
+
+    if comprovante is not None:
+        part_comprovante = MIMEBase('application', "octet-stream")
+        part_comprovante.set_payload(comprovante.getvalue())
+        encoders.encode_base64(part_comprovante)
+        part_comprovante.add_header('Content-Disposition', f'attachment; filename="{comprovante.name}"')
+        msg.attach(part_comprovante)
+
+    if caminho_csv and os.path.exists(caminho_csv):
+        with open(caminho_csv, "rb") as attachment:
+            part_csv = MIMEBase('application', "octet-stream")
+            part_csv.set_payload(attachment.read())
+        encoders.encode_base64(part_csv)
+        part_csv.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(caminho_csv)}"')
+        msg.attach(part_csv)
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        server.login(remetente, senha)
+        server.sendmail(remetente, destinatarios, msg.as_string())
+
+# ==== Interface do Streamlit ====
+
+st.title("👕 Venda de Camisas Oficiais")
+st.divider()
+
+# --- SEÇÃO INTERATIVA (FORA DO FORM) ---
+opcao_compra_key = st.selectbox(
+    "Selecione sua opção de compra",
+    [
+        "1 Camisa Jogador",
+        "1 Camisa Jogador + 1 Camisa Torcedor",
+        "1 Camisa Torcedor",
+        "2 Camisas Torcedor"
+    ],
+    help="Escolha o pacote de camisas que deseja adquirir."
+)
+
+if "Jogador" in opcao_compra_key and "Torcedor" in opcao_compra_key:
+    tipos_camisas = ["Jogador", "Torcedor"]; preco_total = 260
+elif "1 Camisa Jogador" in opcao_compra_key:
+    tipos_camisas = ["Jogador"]; preco_total = 150
+elif "2 Camisas Torcedor" in opcao_compra_key:
+    tipos_camisas = ["Torcedor", "Torcedor"]; preco_total = 220
+else:
+    tipos_camisas = ["Torcedor"]; preco_total = 110
+
+st.subheader(f"💰 Valor total: R$ {preco_total},00")
+st.subheader("👕 Detalhes das Camisas")
+
+nomes_camisa, numeros_camisa, tamanhos_camisa = [], [], []
+for i, tipo in enumerate(tipos_camisas):
+    with st.container(border=True):
+        st.markdown(f"**Camisa #{i+1} ({tipo})**")
+        col1, col2, col3 = st.columns(3)
+        with col1: nome = st.text_input(f"Nome na camisa #{i+1}", key=f"nome_{i}")
+        with col2: numero = st.number_input(f"Número (0-99)", min_value=0, max_value=99, key=f"num_{i}")
+        with col3: tamanho = st.selectbox("Tamanho", ["P", "M", "G", "GG", "XG"], key=f"tamanho_{i}")
+        
+        nomes_camisa.append(nome); numeros_camisa.append(numero); tamanhos_camisa.append(tamanho)
+        
+        if tipo == "Jogador" and numero in JOGADORES_FIXOS:
+            st.warning(f"⚠️ Atenção: O número {numero} já pertence ao jogador {JOGADORES_FIXOS[numero]}.")
+
+# --- SEÇÃO DE SUBMISSÃO (DENTRO DO FORM) ---
+st.divider()
+with st.form("finalizar_compra_form"):
+    st.subheader("✉️ Seus Dados e Pagamento")
+    
+    # >>> CAMPO DE NOME DO COMPRADOR ADICIONADO <<<
     nome_comprador = st.text_input("Seu nome completo")
-    email_comprador = st.text_input("Seu e-mail de contato")
-    st.markdown("---")
-    tipo_camisa = st.radio("Escolha o modelo da camisa", options=["Jogador", "Torcedor"], horizontal=True)
-    quantidade = st.number_input("Quantidade", min_value=1, max_value=10, value=1)
-    preco_unitario = PRECOS[tipo_camisa]
-    st.markdown(f"**Valor total do pedido: R$ {preco_unitario * quantidade:.2f}**")
-    st.markdown("---")
-    st.subheader("Personalização das Camisas")
-    camisas_personalizadas = []
-    for i in range(quantidade):
-        st.markdown(f"**Camisa {i+1}**")
-        nome_na_camisa = st.text_input(f"Nome na Camisa #{i+1}", key=f"nome_{i}")
-        numero_na_camisa = st.number_input(f"Número na Camisa #{i+1}", min_value=0, max_value=99, step=1, key=f"num_{i}")
-        camisas_personalizadas.append({"nome": nome_na_camisa.strip(), "numero": int(numero_na_camisa)})
-    enviado = st.form_submit_button("Finalizar e Ir para Pagamento")
+    email_comprador = st.text_input("Seu melhor e-mail para contato")
+    
+    link_pagamento = LINKS_PAGAMENTO.get(opcao_compra_key, '#')
+    st.info("Realize o pagamento no link abaixo e depois volte para esta guia para anexar o comprovante.")
+    st.markdown(f"🔗 [PAGAR AGORA (R$ {preco_total},00)]({link_pagamento})")
+    comprovante = st.file_uploader("Anexe o comprovante de pagamento aqui", type=["png", "jpg", "jpeg", "pdf"])
+    
+    st.divider()
+    col1, col2 = st.columns(2)
+    with col1:
+        finalizar_btn = st.form_submit_button("Finalizar Compra", use_container_width=True)
+    with col2:
+        nova_compra_btn = st.form_submit_button("Finalizar e Nova Compra", use_container_width=True)
 
-# ---------- PROCESSAMENTO DO FORM ----------
-if enviado:
-    erros = []
-    avisos = []
-    if not nome_comprador.strip():
-        erros.append("Por favor, preencha seu nome.")
-    if not validar_email(email_comprador.strip()):
-        erros.append("Por favor, informe um e-mail válido.")
-    for camisa in camisas_personalizadas:
-        if not camisa["nome"]:
-            erros.append(f"Nome da camisa para o número {camisa['numero']} não preenchido.")
-        if tipo_camisa == "Jogador" and camisa["numero"] in JOGADORES_FIXOS:
-            avisos.append(f"Atenção: O número {camisa['numero']} já é usado pelo jogador {JOGADORES_FIXOS[camisa['numero']]} (não exclusivo).")
 
-    if erros:
-        for erro in erros:
-            st.error(erro)
-    else:
-        if avisos:
-            st.warning("Avisos sobre sua escolha:")
-            for aviso in avisos:
-                st.info(aviso)
+# --- LÓGICA DE PROCESSAMENTO APÓS CLICAR EM QUALQUER UM DOS BOTÕES ---
+if finalizar_btn or nova_compra_btn:
+    erro = False
+    # >>> VALIDAÇÃO DO NOME DO COMPRADOR ADICIONADA <<<
+    if not nome_comprador.strip(): st.error("❌ Por favor, preencha seu nome completo."); erro = True
+    if not email_valido(email_comprador): st.error("❌ E-mail inválido."); erro = True
+    if any(nome.strip() == "" for nome in nomes_camisa): st.error("❌ Preencha o nome para todas as camisas."); erro = True
+    if not comprovante: st.error("❌ O comprovante de pagamento é obrigatório."); erro = True
 
-        # cria pedido no Supabase com status inicial 'pending'
-        valor_total = quantidade * preco_unitario
-        id_externo = str(uuid.uuid4())
-        itens_para_mp = []
-        detalhes_pedido = []
-        for i, camisa in enumerate(camisas_personalizadas):
-            itens_para_mp.append({
-                "title": f"Camisa {tipo_camisa} - {camisa['nome']} N°{camisa['numero']}",
-                "quantity": 1,
-                "unit_price": float(preco_unitario),
-                "currency_id": "BRL"
-            })
-            detalhes_pedido.append(f"{i+1}. {camisa['nome']} N°{camisa['numero']}")
+    if not erro:
+        with st.spinner("Processando sua compra..."):
+            try:
+                dados_para_supabase = {
+                    "nome_compra": ", ".join(nomes_camisa), "e_mail": email_comprador,
+                    "tamanho": ", ".join(tamanhos_camisa), "quantidade": len(tipos_camisas),
+                    "valor_total": preco_total, "status_pagam": "Aguardando Confirmação",
+                    "tipo_camisa": ", ".join(tipos_camisas)
+                }
+                supabase.table("compra_camisas").insert(dados_para_supabase).execute()
 
-        dados_pedido = {
-            "nome_comprador": nome_comprador.strip(),
-            "email_comprador": email_comprador.strip().lower(),
-            "tipo_camisa": tipo_camisa,
-            "quantidade": quantidade,
-            "valor_total": float(valor_total),
-            "mercado_pago_id": id_externo,
-            "status_pagamento": "pending",
-            "detalhes_pedido": "; ".join(detalhes_pedido),
-            "created_at": datetime.utcnow().isoformat()
-        }
-        try:
-            supabase.table("venda_camisas").insert(dados_pedido).execute()
-        except Exception as e:
-            st.error(f"Erro ao salvar pedido no Supabase: {e}")
-            st.stop()
+                response = supabase.table("compra_camisas").select("*").order("created_at", desc=True).execute()
+                caminho_csv = None
+                if response.data:
+                    df = pd.DataFrame(response.data)
+                    caminho_csv = "export_total_pedidos.csv"
+                    df.to_csv(caminho_csv, index=False, encoding='utf-8-sig')
+                
+                destinatarios = [d.strip() for d in EMAIL_DESTINATARIO.split(",")]
+                assunto_email = f"Novo Pedido de Camisa - {nome_comprador}"
+                detalhes_camisas = "\n".join([f"  - Camisa {i+1} ({tipos_camisas[i]}): {nomes_camisa[i]}, Nº {numeros_camisa[i]}, Tam. {tamanhos_camisa[i]}" for i in range(len(tipos_camisas))])
+                
+                # >>> NOME DO COMPRADOR ADICIONADO AO CORPO DO E-MAIL <<<
+                corpo_email = f"""
+Novo pedido de camisas recebido.
 
-        link_pagamento = criar_preferencia_pagamento(itens_para_mp, id_externo)
-        if link_pagamento:
-            st.success("Pedido registrado! Clique no link abaixo para pagar:")
-            st.markdown(f"[Pagar R$ {valor_total:.2f}]({link_pagamento})", unsafe_allow_html=True)
-            # não fazer redirect automático em produção sem feedback ao usuário
-        else:
-            st.error("Não foi possível gerar o link de pagamento. Tente novamente mais tarde.")
+DADOS DO COMPRADOR:
+- Nome: {nome_comprador}
+- E-mail: {email_comprador}
+- Valor Total: R$ {preco_total},00
 
-# ---------- RETORNO via query_params (back_urls) ----------
-query_params = st.experimental_get_query_params()
-if "mp_status" in query_params:
-    status = query_params.get("mp_status", [""])[0]
-    pedido_id = query_params.get("id", [""])[0]
-    if status == "success":
-        st.success("✅ Pagamento aprovado com sucesso! Obrigado pela sua compra.")
-        try:
-            supabase.table("venda_camisas").update({"status_pagamento": "approved"}).eq("mercado_pago_id", pedido_id).execute()
-        except Exception as e:
-            st.error(f"Erro ao atualizar pedido: {e}")
-    elif status == "failure":
-        st.error("❌ Pagamento falhou. Tente novamente.")
-    elif status == "pending":
-        st.info("Pagamento pendente.")
-    # limpa query params visivelmente (não remove histórico do navegador)
-    st.experimental_set_query_params()
+DETALHES DO PEDIDO:
+{detalhes_camisas}
+
+O comprovante de pagamento e o CSV atualizado de todos os pedidos estão em anexo.
+"""
+                
+                enviar_email_confirmacao(EMAIL_REMETENTE, EMAIL_SENHA, destinatarios, assunto_email, corpo_email, comprovante, caminho_csv)
+                
+                if finalizar_btn:
+                    # >>> MENSAGEM DE SUCESSO PERSONALIZADA <<<
+                    primeiro_nome = nome_comprador.split()[0]
+                    st.success(f"✅ Compra finalizada com sucesso! Obrigado, {primeiro_nome}!")
+                    st.balloons()
+                
+                elif nova_compra_btn:
+                    st.toast("✅ Compra registrada! A página será reiniciada.", icon="🎉")
+                    time.sleep(2)
+                    st.rerun()
+
+            except Exception as e:
+                st.error(f"Ocorreu um erro ao processar seu pedido: {e}")
