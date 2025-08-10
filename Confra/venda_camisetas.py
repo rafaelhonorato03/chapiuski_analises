@@ -82,7 +82,7 @@ def enviar_email_confirmacao(remetente, senha, destinatarios, assunto, corpo, co
 
 # ==== Interface do Streamlit ====
 
-st.title("👕 Venda de Camisas Oficiais")
+st.title("👕 Venda de Camisas Chapiuski - 2025")
 st.divider()
 
 # --- SEÇÃO INTERATIVA (FORA DO FORM) ---
