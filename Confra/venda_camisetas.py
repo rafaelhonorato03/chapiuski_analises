@@ -16,12 +16,12 @@ from dotenv import load_dotenv
 st.set_page_config(
     layout="centered",
     page_title="Venda de Camisas 2025",
-    page_icon="👕"
+    page_icon="⚽"
 )
 
 # ==== Configurações Iniciais e Variáveis de Ambiente ====
 # Certifique-se de ter um arquivo .env na raiz do projeto com estas variáveis
-# load_dotenv() 
+load_dotenv() 
 
 # Conexão com o Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -108,12 +108,14 @@ def enviar_email_confirmacao(remetente, senha, destinatarios, assunto, corpo, co
 
 # ==== Interface do Streamlit ====
 
-st.title("👕 Camisas Chapiuski - Temporada 2025")
+st.markdown("<h1 style='text-align: center;'>Chapiuski - Temporada 2025</h1>", unsafe_allow_html=True)
+
+st.markdown("<h4 style='text-align: center; color: #333;'>1, 2, 4... Chapiuski!!! 🖤⚽💛</h4>", unsafe_allow_html=True)
 
 # --- IMAGEM NO TOPO ---
 # Coloque as imagens na mesma pasta que o script .py
 try:
-    st.image('camisas 2025.jpg', caption='Modelos oficiais para a temporada 2025')
+    st.image('Confra\camisas 2025.jpg', caption='Modelos oficiais para a temporada 2025')
 except Exception:
     st.warning("⚠️ Imagem 'camisas 2025.jpg' não encontrada. Coloque-a na mesma pasta do script.")
 
@@ -147,12 +149,12 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
     try:
         if qtd_jogador > 0:
             with cols_img[0]:
-                st.image('camisa atleta 2025.jpg', caption='Modelo Atleta (Jogador)')
+                st.image('Confra\camisa atleta 2025.jpg', caption='Modelo Atleta (Jogador)')
         if qtd_torcedor > 0:
             # Se não houver camisa de jogador, a de torcedor ocupa o espaço todo
             col_idx = 1 if qtd_jogador > 0 else 0
             with cols_img[col_idx]:
-                st.image('camisa torcedor 2025.jpg', caption='Modelo Torcedor')
+                st.image('Confra\camisa torcedor 2025.jpg', caption='Modelo Torcedor')
     except Exception:
         st.warning("⚠️ Imagens 'camisa atleta 2025.jpg' ou 'camisa torcedor 2025.jpg' não encontradas.")
     st.markdown("---")
