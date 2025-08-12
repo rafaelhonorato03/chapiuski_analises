@@ -254,12 +254,13 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
                 try:
                     # --- Salva no Supabase ---
                     dados_para_supabase = {
-                        "nome_compra": ", ".join([f"{nome} ({tipo})" for nome, tipo in zip(nomes_camisa, tipos_camisas)]),
-                        "e_mail": email_comprador,
+                        "nome_comprador": nome_comprador,
+                        "detalhes_pedido": ", ".join([f"{nome} ({tipo})" for nome, tipo in zip(nomes_camisa, tipos_camisas)]),
+                        "email_comprador": email_comprador,
                         "tamanho": ", ".join(tamanhos_camisa),
                         "quantidade": len(tipos_camisas),
                         "valor_total": preco_total, # Salva o valor base (PIX)
-                        "status_pagam": "Aguardando Confirmação",
+                        "status_pagamento": "Aguardando Confirmação",
                         "tipo_camisa": ", ".join(tipos_camisas)
                     }
                     supabase.table("compra_camisas").insert(dados_para_supabase).execute()
