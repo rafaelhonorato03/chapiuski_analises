@@ -109,7 +109,7 @@ def enviar_email_confirmacao(remetente, senha, destinatarios, assunto, corpo, co
 # ==== Interface do Streamlit ====
 
 st.markdown("<h1 style='text-align: center;'>Chapiuski - Temporada 2025</h1>", unsafe_allow_html=True)
-st.markdown("<h4 style='text-align: center; color: #333;'>1, 2, 4... Chapiuski!!! 🖤⚽💛</h4>", unsafe_allow_html=True)
+st.markdown("<h4 style='text-align: center; color: #333;'>1, 2, 4... Chapiuski!!! 💛🖤⚽</h4>", unsafe_allow_html=True)
 
 # --- IMAGEM NO TOPO ---
 try:
@@ -195,7 +195,7 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
         with st.expander("Opção 1: Pagar com PIX (Sem taxas)", expanded=True):
             st.markdown(f"### Valor total: **R$ {preco_total},00 (exclusivo para PIX)**")
             # ======== CHAVE PIX ATUALIZADA AQUI ========
-            st.markdown("Favorecido: **Hassan Nehme Marques**")
+            st.markdown("Favorecido: **Hassan Marques Nehme**")
             st.markdown("Chave PIX (Telefone):")
             st.code("1194991465")
             # ============================================
