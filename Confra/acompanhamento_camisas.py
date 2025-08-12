@@ -63,9 +63,15 @@ def split_value(row_value, index):
 df_expanded['seq_pedido'] = df_expanded.groupby('id').cumcount()
 
 # 5. Aplica a função split para separar os detalhes de cada camisa
-df_expanded['nome_na_camisa'] = df_expanded.apply(lambda x: split_value(x['nome_compra'], x['seq_pedido']), axis=1)
+# <<< ALTERAÇÃO 1: CORREÇÃO DA EXTRAÇÃO DOS DETALHES DA CAMISA >>>
+# Aponta para a coluna 'detalhes_pedido' e extrai apenas o nome (removendo o tipo entre parênteses)
+df_expanded['nome_na_camisa'] = df_expanded.apply(
+    lambda x: split_value(x['detalhes_pedido'], x['seq_pedido']).split('(')[0].strip(), 
+    axis=1
+)
 df_expanded['tamanho_individual'] = df_expanded.apply(lambda x: split_value(x['tamanho'], x['seq_pedido']), axis=1)
 df_expanded['tipo_individual'] = df_expanded.apply(lambda x: split_value(x['tipo_camisa'], x['seq_pedido']), axis=1)
+
 
 # 6. Mapeia o preço para cada tipo de camisa
 precos = {'Jogador': 150, 'Torcedor': 115}
@@ -161,18 +167,20 @@ st.plotly_chart(fig_heatmap, use_container_width=True)
 
 
 # --- TABELA DE DADOS BRUTOS ---
+# <<< ALTERAÇÃO 2: CORREÇÃO DA TABELA FINAL >>>
 with st.expander("📄 Ver todos os pedidos detalhados"):
-    # Seleciona e renomeia colunas para exibição
+    # Seleciona e renomeia colunas para exibição usando os nomes corretos da tabela
     df_display = df_expanded[[
-        'data_pedido', 'nome_compra', 'e_mail', 'nome_na_camisa', 
+        'data_pedido', 'nome_comprador', 'email_comprador', 'nome_na_camisa', 
         'tipo_individual', 'tamanho_individual', 'preco_individual'
     ]].rename(columns={
         'data_pedido': 'Data do Pedido',
-        'nome_compra': 'Comprador Original',
-        'e_mail': 'Email do Comprador',
+        'nome_comprador': 'Nome do Comprador',
+        'email_comprador': 'Email do Comprador',
         'nome_na_camisa': 'Nome na Camisa',
         'tipo_individual': 'Tipo',
         'tamanho_individual': 'Tamanho',
         'preco_individual': 'Preço (R$)'
     })
-    st.dataframe(df_display)
+    # Remove linhas duplicadas para uma visualização mais limpa
+    st.dataframe(df_display.drop_duplicates())
