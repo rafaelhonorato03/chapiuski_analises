@@ -96,9 +96,9 @@ def enviar_email_confirmacao(remetente, senha, destinatarios, assunto, corpo, co
         with open(caminho_csv, "rb") as attachment:
             part_csv = MIMEBase('application', "octet-stream")
             part_csv.set_payload(attachment.read())
-        encoders.encode_base64(part_csv)
-        part_csv.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(caminho_csv)}"')
-        msg.attach(part_csv)
+            encoders.encode_base64(part_csv)
+            part_csv.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(caminho_csv)}"')
+            msg.attach(part_csv)
 
     # Envio do e-mail
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
@@ -109,13 +109,11 @@ def enviar_email_confirmacao(remetente, senha, destinatarios, assunto, corpo, co
 # ==== Interface do Streamlit ====
 
 st.markdown("<h1 style='text-align: center;'>Chapiuski - Temporada 2025</h1>", unsafe_allow_html=True)
-
 st.markdown("<h4 style='text-align: center; color: #333;'>1, 2, 4... Chapiuski!!! 🖤⚽💛</h4>", unsafe_allow_html=True)
 
 # --- IMAGEM NO TOPO ---
-# Coloque as imagens na mesma pasta que o script .py
 try:
-    st.image('Confra\camisas 2025.jpg', caption='Modelos oficiais para a temporada 2025')
+    st.image('Confra/camisas 2025.jpg', caption='Modelos oficiais para a temporada 2025')
 except Exception:
     st.warning("⚠️ Imagem 'camisas 2025.jpg' não encontrada. Coloque-a na mesma pasta do script.")
 
@@ -126,19 +124,13 @@ st.subheader("1. Escolha a quantidade de camisas")
 col1, col2 = st.columns(2)
 with col1:
     qtd_jogador = st.number_input(
-        "Camisas **JOGADOR** (R$ 150,00)",
-        min_value=0,
-        max_value=3,
-        step=1,
-        key="qtd_jogador"
+        "Camisas **JOGADOR** (**R$ 150,00 no PIX**)",
+        min_value=0, max_value=3, step=1, key="qtd_jogador"
     )
 with col2:
     qtd_torcedor = st.number_input(
-        "Camisas **TORCEDOR** (R$ 115,00)",
-        min_value=0,
-        max_value=3,
-        step=1,
-        key="qtd_torcedor"
+        "Camisas **TORCEDOR** (**R$ 115,00 no PIX**)",
+        min_value=0, max_value=3, step=1, key="qtd_torcedor"
     )
 
 # --- LÓGICA DE COMPRA E VALIDAÇÃO INICIAL ---
@@ -149,12 +141,11 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
     try:
         if qtd_jogador > 0:
             with cols_img[0]:
-                st.image('Confra\camisa atleta 2025.jpg', caption='Modelo Atleta (Jogador)')
+                st.image('Confra/camisa atleta 2025.jpg', caption='Modelo Atleta (Jogador)')
         if qtd_torcedor > 0:
-            # Se não houver camisa de jogador, a de torcedor ocupa o espaço todo
             col_idx = 1 if qtd_jogador > 0 else 0
             with cols_img[col_idx]:
-                st.image('Confra\camisa torcedor 2025.jpg', caption='Modelo Torcedor')
+                st.image('Confra/camisa torcedor 2025.jpg', caption='Modelo Torcedor')
     except Exception:
         st.warning("⚠️ Imagens 'camisa atleta 2025.jpg' ou 'camisa torcedor 2025.jpg' não encontradas.")
     st.markdown("---")
@@ -163,7 +154,7 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
     preco_total = (qtd_jogador * PRECO_JOGADOR) + (qtd_torcedor * PRECO_TORCEDOR)
     tipos_camisas = ["Jogador"] * qtd_jogador + ["Torcedor"] * qtd_torcedor
     
-    st.subheader(f"💰 Valor total do pedido: R$ {preco_total},00")
+    st.subheader(f"💰 Valor total do pedido: **R$ {preco_total},00 (via PIX)**")
     st.subheader("2. Detalhes de cada camisa")
 
     nomes_camisa, numeros_camisa, tamanhos_camisa = [], [], []
@@ -176,7 +167,6 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
             with col2:
                 numero = st.number_input(f"Número (0-99)", min_value=0, max_value=99, key=f"num_{i}")
             with col3:
-                # ===== LINHA ALTERADA =====
                 tamanho = st.selectbox(
                     "Tamanho", 
                     ["P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5"], 
@@ -193,22 +183,47 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
     # --- SEÇÃO DE SUBMISSÃO (DENTRO DO FORM) ---
     st.divider()
     with st.form("finalizar_compra_form"):
-        st.subheader("✉️ 3. Seus dados e pagamento")
+        st.subheader("✉️ 3. Seus dados e forma de pagamento")
         
         nome_comprador = st.text_input("Seu nome completo")
         email_comprador = st.text_input("Seu melhor e-mail para contato")
         
-        # Obtém o link de pagamento correto
+        st.divider()
+        st.markdown("#### **Escolha a forma de pagamento:**")
+
+        # Opção 1: PIX
+        with st.expander("Opção 1: Pagar com PIX (Sem taxas)", expanded=True):
+            st.markdown(f"### Valor total: **R$ {preco_total},00 (exclusivo para PIX)**")
+            # ======== CHAVE PIX ATUALIZADA AQUI ========
+            st.markdown("Favorecido: **Hassan Nehme Marques**")
+            st.markdown("Chave PIX (Telefone):")
+            st.code("1194991465")
+            # ============================================
+            st.info("Após realizar o pagamento via PIX, anexe o comprovante logo abaixo.")
+
+        # Opção 2: Link de Pagamento (Cartão de Crédito)
         tupla_compra = (qtd_jogador, qtd_torcedor)
         link_pagamento = LINKS_PAGAMENTO.get(tupla_compra, '#')
-        
+
         if link_pagamento != '#':
-            st.info("Realize o pagamento no link abaixo e depois volte para esta guia para anexar o comprovante.")
-            st.markdown(f"🔗 [**CLIQUE AQUI PARA PAGAR (R$ {preco_total},00)**]({link_pagamento})", unsafe_allow_html=True)
-            comprovante = st.file_uploader("Anexe o comprovante de pagamento aqui", type=["png", "jpg", "jpeg", "pdf"])
+            with st.expander("Opção 2: Pagar com Link (Cartão de Crédito com taxas)"):
+                st.markdown(f"🔗 [**CLIQUE AQUI PARA ACESSAR O LINK DE PAGAMENTO**]({link_pagamento})", unsafe_allow_html=True)
+                st.warning(
+                    """
+                    **ATENÇÃO:** O pagamento através do link tem a **taxa da operadora**. 
+                    Caso opte por **parcelar**, haverá também a **taxa de parcelamento** cobrada no momento da transação.
+                    """
+                )
+                st.info("Após realizar o pagamento pelo link, anexe o comprovante logo abaixo.")
         else:
-            st.error("Combinação de camisas inválida. Contacte o administrador.")
-            comprovante = None # Desabilita upload se o link for inválido
+            st.error("Combinação de camisas inválida para gerar link de pagamento. Contacte o administrador.")
+
+        st.divider()
+        # Uploader de comprovante unificado
+        comprovante = st.file_uploader(
+            "Anexe o comprovante de pagamento aqui (seja do PIX ou do Link)", 
+            type=["png", "jpg", "jpeg", "pdf"]
+        )
         
         st.divider()
         col_btn1, col_btn2 = st.columns(2)
@@ -243,7 +258,7 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
                         "e_mail": email_comprador,
                         "tamanho": ", ".join(tamanhos_camisa),
                         "quantidade": len(tipos_camisas),
-                        "valor_total": preco_total,
+                        "valor_total": preco_total, # Salva o valor base (PIX)
                         "status_pagam": "Aguardando Confirmação",
                         "tipo_camisa": ", ".join(tipos_camisas)
                     }
@@ -268,14 +283,14 @@ Novo pedido de camisas da temporada 2025 recebido!
 DADOS DO COMPRADOR:
 - Nome: {nome_comprador}
 - E-mail: {email_comprador}
-- Valor Total: R$ {preco_total},00
+- Valor Base (PIX): R$ {preco_total},00
 - Combinação: {qtd_jogador} Jogador / {qtd_torcedor} Torcedor
 
 DETALHES DO PEDIDO:
 {detalhes_camisas_email}
 
 O comprovante de pagamento e o CSV atualizado de todos os pedidos estão em anexo.
-Verifique o pagamento e atualize o status no painel do Supabase.
+Verifique o pagamento (se for por link, o valor pode ser maior devido às taxas) e atualize o status no painel do Supabase.
 """
                     enviar_email_confirmacao(EMAIL_REMETENTE, EMAIL_SENHA, destinatarios, assunto_email, corpo_email, comprovante, caminho_csv)
                     
