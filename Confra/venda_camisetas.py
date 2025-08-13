@@ -19,6 +19,12 @@ st.set_page_config(
     page_icon="⚽"
 )
 
+# Bloco para exibir a mensagem de sucesso que sobrevive ao rerun da página
+if "mensagem_sucesso" in st.session_state:
+    st.success(st.session_state.mensagem_sucesso, icon="🎉")
+    # Limpa a mensagem da memória para não exibi-la novamente
+    del st.session_state.mensagem_sucesso
+
 # ==== Configurações Iniciais e Variáveis de Ambiente ====
 load_dotenv() 
 
@@ -329,16 +335,17 @@ Verifique o pagamento e atualize o status no painel do Supabase.
                         st.balloons()
                     
                     elif nova_compra_btn:
-                        # Mostra uma mensagem instantânea de sucesso.
-                        st.toast("✅ Compra registrada! Preparando para um novo pedido...", icon="🎉")
+                        # 1. Guarda a mensagem de sucesso na sessão para ser exibida após o recarregamento
+                        primeiro_nome = nome_comprador.split()[0]
+                        st.session_state.mensagem_sucesso = f"Pedido confirmado, {primeiro_nome}! Sua compra foi registrada com sucesso."
 
-                        # Limpa todos os valores de widgets armazenados na sessão.
-                        
-                        keys_para_deletar = list(st.session_state.keys())
-                        for key in keys_para_deletar:
+                        # 2. Limpa todos os campos do formulário para o reset
+                        # Vamos ter o cuidado de não apagar a própria chave da mensagem que acabamos de criar
+                        chaves_para_limpar = [key for key in st.session_state.keys() if key != 'mensagem_sucesso']
+                        for key in chaves_para_limpar:
                             del st.session_state[key]
     
-                        # Força um rerun imediato da aplicação. A página aparecerá completamente limpa.
+                        # 3. Força o recarregamento da página. A mensagem será exibida no topo.
                         st.rerun()
 
                 except Exception as e:
