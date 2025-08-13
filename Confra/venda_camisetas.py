@@ -273,7 +273,7 @@ Verifique o pagamento e atualize o status no painel do Supabase.
                     <body style="font-family: sans-serif;">
                         <h2>Olá, {primeiro_nome}!</h2>
                         <p>Seu pedido para as camisas da temporada 2025 do Chapiuski foi recebido com sucesso. 💛🖤</p>
-                        <p>Estamos confirmando o seu pagamento. Você será notificado sobre os próximos passos.</p>
+                        <p>Estamos confirmando o seu pagamento.</p>
                         <hr>
                         <h3>Resumo do seu Pedido:</h3>
                         <ul>
@@ -291,7 +291,7 @@ Verifique o pagamento e atualize o status no painel do Supabase.
                     # --- Mensagem de sucesso para o usuário ---
                     if finalizar_btn:
                         st.success(f"✅ Compra finalizada com sucesso! Obrigado, {primeiro_nome}!")
-                        st.info("Seu pedido para as camisas da temporada 2025 do Chapiuski foi recebido com sucesso. 💛🖤. Estamos confirmando o seu pagamento. Você será notificado sobre os próximos passos.")
+                        st.info("Seu pedido para as camisas da temporada 2025 do Chapiuski foi recebido com sucesso. 💛🖤. Estamos confirmando o seu pagamento.")
                         st.balloons()
                     
                     elif nova_compra_btn:
