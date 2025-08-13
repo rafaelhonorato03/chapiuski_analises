@@ -329,8 +329,16 @@ Verifique o pagamento e atualize o status no painel do Supabase.
                         st.balloons()
                     
                     elif nova_compra_btn:
-                        st.toast("✅ Compra registrada! A página será reiniciada para um novo pedido.", icon="🎉")
-                        time.sleep(3)
+                        # Mostra uma mensagem instantânea de sucesso.
+                        st.toast("✅ Compra registrada! Preparando para um novo pedido...", icon="🎉")
+
+                        # Limpa todos os valores de widgets armazenados na sessão.
+                        
+                        keys_para_deletar = list(st.session_state.keys())
+                        for key in keys_para_deletar:
+                            del st.session_state[key]
+    
+                        # Força um rerun imediato da aplicação. A página aparecerá completamente limpa.
                         st.rerun()
 
                 except Exception as e:
