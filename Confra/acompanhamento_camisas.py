@@ -44,6 +44,7 @@ st.markdown("Painel para visualização em tempo real dos pedidos de camisas da 
 
 # 1. Converte a coluna de data para o formato datetime
 df['data_pedido'] = pd.to_datetime(df['created_at'])
+df['data_pedido'] = df['data_pedido'].dt.tz_convert('America/Sao_Paulo')
 
 # 2. "Explode" o DataFrame: cria uma linha para cada camisa individual comprada
 #    Isso é essencial para analisar cada item separadamente.
