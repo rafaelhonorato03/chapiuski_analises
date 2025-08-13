@@ -60,6 +60,16 @@ def email_valido(email):
         return re.match(r"[^@]+@[^@]+\.[^@]+", email)
     return False
 
+# Validação do Whatsapp
+def whatsapp_valido(whatsapp):
+    """Verifica se o WhatsApp tem um formato minimamente válido (10 ou 11 dígitos)."""
+    if whatsapp:
+        # Remove todos os caracteres que não são dígitos
+        numeros = re.sub(r'\D', '', whatsapp)
+        # Verifica se tem 10 ou 11 dígitos (comum para fixo+DDD ou celular+DDD)
+        return len(numeros) >= 10
+    return False
+
 # Função para enviar e-mail de notificação para o administrador
 def enviar_email_notificacao(remetente, senha, destinatarios, assunto, corpo, comprovante, caminho_csv=None):
     """Envia o e-mail de notificação para o admin com todos os anexos."""
@@ -108,14 +118,18 @@ def enviar_email_para_comprador(remetente, senha, destinatario, assunto, corpo):
 
 # ==== Interface do Streamlit ====
 
-st.markdown("<h1 style='text-align: center;'>Chapiuski - Temporada 2025</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>Manto aurinegro - Temporada 25/26</h1>", unsafe_allow_html=True)
 st.markdown("<h4 style='text-align: center; color: #333;'>1, 2, 4... Chapiuski!!! 💛🖤⚽</h4>", unsafe_allow_html=True)
 
 try:
-    st.image('Confra/camisas 2025.jpg', caption='Modelos oficiais para a temporada 2025')
+    st.image('Confra/camisas 2025.jpg', caption='Modelos oficiais para a temporada 25/26')
 except Exception:
     st.warning("⚠️ Imagem 'camisas 2025.jpg' não encontrada.")
 st.divider()
+
+st.warning(
+    "**Atenção:** Permitimos no máximo 6 peças por pedido, sendo até 3 do modelo Jogador e até 3 do modelo Torcedor."
+)
 
 st.subheader("1. Escolha a quantidade de camisas")
 col1, col2 = st.columns(2)
@@ -142,8 +156,22 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
     preco_total = (qtd_jogador * PRECO_JOGADOR) + (qtd_torcedor * PRECO_TORCEDOR)
     tipos_camisas = ["Jogador"] * qtd_jogador + ["Torcedor"] * qtd_torcedor
     
-    st.subheader(f"💰 Valor total do pedido: **R$ {preco_total},00**")
     st.subheader("2. Detalhes de cada camisa")
+
+    #Expander com detalhes de medidas das camisas
+    try:
+        with st.expander("📏 Dúvida com o tamanho? **Clique aqui para ver as tabelas de medidas**"):
+            col_medida1, col_medida2 = st.columns(2)
+            with col_medida1:
+                # Altere o nome do arquivo se necessário (ex: .jpg, .jpeg)
+                st.image('Confra/tabela_medidas_jogador.jpg', caption='Medidas Modelo JOGADOR')
+            with col_medida2:
+                # Altere o nome do arquivo se necessário (ex: .jpg, .jpeg)
+                st.image('Confra/tabela_medidas_torcedor.jpg', caption='Medidas Modelo TORCEDOR')
+    except FileNotFoundError:
+        st.warning("⚠️ Imagens das tabelas de medida não encontradas. Verifique os nomes e caminhos dos arquivos.")
+    except Exception as e:
+        st.error(f"Ocorreu um erro ao carregar as tabelas de medida: {e}")
 
     nomes_camisa, numeros_camisa, tamanhos_camisa = [], [], []
     for i, tipo in enumerate(tipos_camisas):
@@ -170,6 +198,7 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
         
         nome_comprador = st.text_input("Seu nome completo")
         email_comprador = st.text_input("Seu melhor e-mail para contato")
+        whatsapp_comprador = st.text_input("Seu WhatsApp (com DDD)", placeholder="Ex: 11987654321")
         
         st.divider()
         st.markdown("#### **Escolha a forma de pagamento:**")
@@ -210,6 +239,9 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
         if not email_valido(email_comprador):
             st.error("❌ O formato do e-mail é inválido.")
             erro = True
+        if not whatsapp_valido(whatsapp_comprador):
+            st.error("❌ O número de WhatsApp é inválido. Por favor, insira o DDD + número.")
+            erro = True
         if any(not nome.strip() for nome in nomes_camisa):
             st.error("❌ Preencha o nome para todas as camisas selecionadas.")
             erro = True
@@ -225,6 +257,7 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
                         "nome_comprador": nome_comprador,
                         "detalhes_pedido": ", ".join([f"{nome} ({tipo})" for nome, tipo in zip(nomes_camisa, tipos_camisas)]),
                         "email_comprador": email_comprador,
+                        "whatsapp_comprador": whatsapp_comprador,
                         "tamanho": ", ".join(tamanhos_camisa),
                         "quantidade": len(tipos_camisas),
                         "valor_total": preco_total,
@@ -252,6 +285,7 @@ Novo pedido de camisas da temporada 2025 recebido!
 DADOS DO COMPRADOR:
 - Nome: {nome_comprador}
 - E-mail: {email_comprador}
+- WhatsApp: {whatsapp_comprador}
 - Valor Base (PIX): R$ {preco_total},00
 - Combinação: {qtd_jogador} Jogador / {qtd_torcedor} Torcedor
 
