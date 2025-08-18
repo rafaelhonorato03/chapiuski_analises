@@ -137,7 +137,7 @@ fig_numeros = px.bar(
     x = 'numero_individual',
     y = 'count',
     title = '#️⃣ Números Mais Pedidos nas Camisas',
-    labels = {'número_individual': 'Número da Camisa', 'count': 'Quantidade de Pedidos'}
+    labels = {'numero_individual': 'Número da Camisa', 'count': 'Quantidade de Pedidos'}
 )
 fig_numeros.update_xaxes(type='category')
 st.plotly_chart(fig_numeros, use_container_width=True)
