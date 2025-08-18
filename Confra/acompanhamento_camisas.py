@@ -121,7 +121,6 @@ with col_graf2:
         color = 'tipo_individual',
         title="📏 Composição de Vendas por Tamanho",
         labels={'tamanho_individual': 'Tamanho', 'count': 'Quantidade Vendida', 'tipo_individual': 'Tipo de Camisa'},
-        color_discrete_map={'Jogador':'gold', 'Torcedor': 'black'},
         category_orders={'tamanho_individual': tamanhos_ordem}
     )
     st.plotly_chart(fig_tamanho, use_container_width=True)
