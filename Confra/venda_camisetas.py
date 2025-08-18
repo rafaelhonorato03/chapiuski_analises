@@ -265,6 +265,7 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
                         "email_comprador": email_comprador,
                         "whatsapp_comprador": whatsapp_comprador,
                         "tamanho": ", ".join(tamanhos_camisa),
+                        "numero_camisa": ",".join(map(str, numeros_camisa)),
                         "quantidade": len(tipos_camisas),
                         "valor_total": preco_total,
                         "status_pagamento": "Aguardando Confirmação",

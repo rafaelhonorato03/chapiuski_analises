@@ -72,11 +72,11 @@ df_expanded['nome_na_camisa'] = df_expanded.apply(
 )
 df_expanded['tamanho_individual'] = df_expanded.apply(lambda x: split_value(x['tamanho'], x['seq_pedido']), axis=1)
 df_expanded['tipo_individual'] = df_expanded.apply(lambda x: split_value(x['tipo_camisa'], x['seq_pedido']), axis=1)
-
+df_expanded['numero_individual'] = df_expanded.apply(lambda x: split_value(x['numero_camisa'], x['seq_pedido']), axis=1)
 
 # 6. Mapeia o preço para cada tipo de camisa
 precos = {'Jogador': 150, 'Torcedor': 115}
-df_expanded['preco_individual'] = df_expanded['tipo_individual'].map(precos)
+df_expanded['preco_individual'] = df_expanded['tipo_individual'].map(precos).fillna(0)
 
 
 # --- CÁLCULO DOS KPIs (INDICADORES-CHAVE) ---
@@ -113,15 +113,35 @@ with col_graf1:
 with col_graf2:
     # Gráfico de Barras: Vendas por Tamanho
     tamanhos_ordem = ["P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5"]
-    df_tamanho = df_expanded['tamanho_individual'].value_counts().reindex(tamanhos_ordem).reset_index()
+    df_tamanho = df_expanded.groupby(['tamanho_individual', 'tipo_individual']).size().reset_index(name='count')
     fig_tamanho = px.bar(
         df_tamanho,
         x='tamanho_individual',
         y='count',
-        title="📏 Vendas por Tamanho",
-        labels={'tamanho_individual': 'Tamanho', 'count': 'Quantidade Vendida'}
+        color = 'tipo_individual',
+        title="📏 Composição de Vendas por Tamanho",
+        labels={'tamanho_individual': 'Tamanho', 'count': 'Quantidade Vendida', 'tipo_individual': 'Tipo de Camisa'},
+        color_discrete_map={'Jogador':'gold', 'Torcedor': 'black'},
+        category_orders={'tamanho_individual': tamanhos_ordem}
     )
     st.plotly_chart(fig_tamanho, use_container_width=True)
+
+# Grafico da quantidade vendida por número
+st.markdown("---")
+df_numeros = df_expanded['numero_individual'].value_counts().reset_index()
+df_numeros = df_numeros[df_numeros['numero_individual'] != '']
+df_numeros['numero_individual'] = pd.to_numeric(df_numeros['numero_individual'])
+df_numeros = df_numeros.sort_values('numero_individual')
+
+fig_numeros = px.bar(
+    df_numeros,
+    x = 'numero_individual',
+    y = 'count',
+    title = '#️⃣ Números Mais Pedidos nas Camisas',
+    labels = {'número_individual': 'Número da Camisa', 'count': 'Quantidade de Pedidos'}
+)
+fig_numeros.update_xaxes(type='category')
+st.plotly_chart(fig_numeros, use_container_width=True)
 
 
 # Gráfico de Linha: Vendas Acumuladas ao Longo do Tempo
@@ -172,16 +192,17 @@ st.plotly_chart(fig_heatmap, use_container_width=True)
 with st.expander("📄 Ver todos os pedidos detalhados"):
     # Seleciona e renomeia colunas para exibição usando os nomes corretos da tabela
     df_display = df_expanded[[
-        'data_pedido', 'nome_comprador', 'email_comprador', 'nome_na_camisa', 
+        'data_pedido', 'nome_comprador', 'email_comprador', 'nome_na_camisa', 'numero_individual',
         'tipo_individual', 'tamanho_individual', 'preco_individual'
     ]].rename(columns={
         'data_pedido': 'Data do Pedido',
         'nome_comprador': 'Nome do Comprador',
         'email_comprador': 'Email do Comprador',
         'nome_na_camisa': 'Nome na Camisa',
+        'numero_individual': 'Número',
         'tipo_individual': 'Tipo',
         'tamanho_individual': 'Tamanho',
         'preco_individual': 'Preço (R$)'
     })
     # Remove linhas duplicadas para uma visualização mais limpa
-    st.dataframe(df_display.drop_duplicates())
+    st.dataframe(df_display, use_container_width=True)
