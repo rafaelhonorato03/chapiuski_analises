@@ -213,7 +213,7 @@ if qtd_jogador > 0 or qtd_torcedor > 0:
             st.markdown(f"### Valor total: **R$ {preco_total},00**")
             st.markdown("Favorecido: **Hassan Marques Nehme**")
             st.markdown("Chave PIX (Telefone):")
-            st.code("1194991465")
+            st.code("11994991465")
             st.info("Após realizar o pagamento via PIX, anexe o comprovante logo abaixo.")
 
         tupla_compra = (qtd_jogador, qtd_torcedor)
