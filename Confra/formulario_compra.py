@@ -184,7 +184,7 @@ st.markdown("<h4 style='text-align: center; color: #333;'>Ingressos e Copos Pers
 try:
     col_img_main1, col_img_main2, col_img_main3 = st.columns([1,2,1])
     with col_img_main2: # Centraliza a imagem principal
-        st.image(r'Confra\CHAP.jpg', caption='Confra Chapiuski 2025', width=500) 
+        st.image('Confra/CHAP.jpg', caption='Confra Chapiuski 2025', width=500) 
 except Exception:
     st.warning("⚠️ Imagem 'CHAP.jpg' não encontrada. Verifique o caminho do arquivo.")
 
@@ -226,7 +226,7 @@ st.subheader("1. Selecione a quantidade")
 col_copo_img_prev1, col_copo_img_prev2, col_copo_img_prev3 = st.columns([1,2,1])
 with col_copo_img_prev2:
     try:
-        st.image(r'Confra\COPO.jpg', caption='Copo Personalizado da Confra', width=200) 
+        st.image('Confra/COPO.jpg', caption='Copo Personalizado da Confra', width=200) 
     except Exception:
         st.warning("⚠️ Imagem 'COPO.jpg' não encontrada.")
 
