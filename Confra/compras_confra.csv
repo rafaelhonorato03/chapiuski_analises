@@ -1,0 +1,2 @@
+﻿id,created_at,nome_comprador,email_comprador,whatsapp_comprador,qtd_confra,qtd_copo,nomes_copo,nomes_participantes,documentos_participantes,valor_pix,valor_credito,tipo_compra,e_crianca,link_pagamento
+1,2025-10-13T20:44:43.346611+00:00,Teste1,rafael.honorato03@gmail.com,11959835330,3,2,"TESTE1, TESTE2","Teste1, Teste2, Teste3","123456, 123456, 123456789",210,221,2 Kit(s) / 0 Confra Avulsa / 0 Copo Avulso (1 Criança(s) Gratuita(s)),"Não, Não, Sim",https://pag.ae/8159Num4o
