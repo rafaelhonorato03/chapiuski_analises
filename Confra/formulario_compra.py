@@ -198,16 +198,16 @@ except Exception:
 st.divider()
 
 st.info(f"""
-    **📅 Data:** 06/12/2025 | **⏰ Horário:** 16h às 22h  
-    **📍 Local:** Penha Society  
-    **⚠️ Vendas:** De 15/10/2025 até 20/11/2025.
+    **📅 Data:** 06/12/2025 | **⏰ Horário:** 16h às 22h  
+    **📍 Local:** Penha Society  
+    **⚠️ Vendas:** De 15/10/2025 até 20/11/2025.
 """)
 
 st.markdown("""
 ### Informações do Evento
 - **Futebol:** 14h às 16h
 - **Open Food:** Churrasco à vontade.
-- **Bebidas:** Bar do Fausto (Chopp, Vodka, Cachaça, Refrigerantes, Sucos e Água - venda local).
+- **Bebidas:** Bar do Fausto (Cerveja, Vodka, Cachaça, Refrigerantes, Sucos e Água - venda local).
 - **Atração:** Pagode ao vivo (19h às 22h).
 - **Extra:** Premiação Anual.
 
@@ -252,18 +252,20 @@ with col_copo_img_prev2:
 col_confra, col_copo = st.columns(2)
 
 with col_confra:
-    qtd_confra = st.number_input(
-        f"Ingressos (Confra) - Disponível: {estoque_disponivel_confra}",
+    qtd_confra_pagantes = st.number_input(
+        f"Ingressos (Confra)",
         min_value=0,
         max_value=min(LIMITE_POR_PEDIDO, estoque_disponivel_confra),
         value=0,
         step=1,
-        key="qtd_confra"
+        key="qtd_confra_pagantes" # Chave alterada para refletir que é o pagante
     )
+    # Variável auxiliar para manter o nome original no restante do código (para o DB)
+    qtd_confra = qtd_confra_pagantes 
 
 with col_copo:
     qtd_copo = st.number_input(
-        f"Copos Personalizados - Disponível: {estoque_disponivel_copo}",
+        f"Copos Personalizados",
         min_value=0,
         max_value=min(LIMITE_POR_PEDIDO, estoque_disponivel_copo),
         value=0,
@@ -277,7 +279,7 @@ if qtd_copo > 0:
     st.markdown("---")
     st.markdown("#### Detalhes da Personalização dos Copos")
     st.info("Insira o nome desejado para cada copo. O limite é de **10 caracteres** por nome, e eles serão impressos em **letras maiúsculas**.")
-    
+ 
     for i in range(qtd_copo):
         nome = st.text_input(
             f"Nome para Copo #{i+1} (Máx. 10 caracteres)",
@@ -286,63 +288,96 @@ if qtd_copo > 0:
             key=f"nome_copo_{i}"
         )
         nomes_copo.append(nome)
-    
+
     st.markdown("---")
 
 if qtd_confra == 0 and qtd_copo == 0:
     st.info("Selecione a quantidade de Ingressos e/ou Copos desejados para continuar.")
     st.stop()
-    
+
 
 # --- SEÇÃO DE DETALHES DOS PARTICIPANTES (Antes do cálculo de preço) ---
 
 st.subheader("2. Detalhes dos Participantes")
 
-# --- Regras para Crianças ---
 st.warning("""
-**ATENÇÃO - Crianças:** Crianças até **12 anos** não pagam o valor do ingresso Confra.
+**ATENÇÃO** Crianças até **12 anos** não pagam.
 
-**Obrigatório:** Informar o **nome completo** e **documento** da criança no formulário abaixo e **marcar a caixa "É Criança (até 12 anos)"** para que o desconto do ingresso seja aplicado ao total da compra.
-
-A partir de 13 anos, pagam valor integral (contam como 1 ingresso).
+**Obrigatório:** Informar a quantidade de crianças abaixo e preencher o **nome completo** e **documento** de cada uma.
 """)
 
-nomes_participantes, documentos_participantes, flags_crianca = [], [], [] # Lista para a nova flag
+# ⭐️ INICIALIZAÇÃO DE LISTAS VAZIAS (CORREÇÃO DO ERRO)
+nomes_pagantes, documentos_pagantes = [], [] 
+nomes_criancas, documentos_criancas = [], [] 
 
-for i in range(qtd_confra):
+
+# ⭐️ BLOCO 1: DETALHES DOS PARTICIPANTES PAGANTES (Adultos)
+st.markdown("#### Participantes (Ingressos Confra)")
+
+flags_crianca_pagantes = [False] * qtd_confra_pagantes # Todas as flags são False
+
+for i in range(qtd_confra_pagantes):
     with st.container(border=True):
-        st.markdown(f"**Dados do Participante de Ingresso #{i+1}**")
-        col_nome, col_doc, col_crianca = st.columns([3, 3, 2]) # Ajuste de colunas
-        
+        st.markdown(f"**Dados do Participante Pagante (Adulto) #{i+1}**")
+        col_nome, col_doc = st.columns(2)
+
         with col_nome:
-            nome = st.text_input(f"Nome Completo (Adulto) / Nome Completo (Criança até 12 anos)", key=f"nome_confra_{i}")
+            nome = st.text_input(f"Nome Completo (Adulto {i+1})", key=f"nome_adulto_{i}")
         with col_doc:
-            documento = st.text_input(f"RG ou Doc. com foto (Adulto) / RG ou Doc. com foto (Criança)", key=f"doc_confra_{i}")
-        with col_crianca:
-            # ⭐️ NOVO CAMPO DE FLAG
-            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-            e_crianca = st.checkbox("É Criança (até 12 anos)", key=f"crianca_flag_{i}")
-        
-        nomes_participantes.append(nome)
-        documentos_participantes.append(documento)
-        flags_crianca.append(e_crianca) # ⭐️ ARMAZENA A FLAG
+            documento = st.text_input(f"RG ou Doc. com foto (Adulto {i+1})", key=f"doc_adulto_{i}")
 
-if qtd_copo > qtd_confra:
-    st.warning("⚠️ Você selecionou mais Copos do que Ingressos. Lembre-se que o copo acompanha o kit ou é vendido individualmente.")
+        nomes_pagantes.append(nome)
+        documentos_pagantes.append(documento)
 
 
-# ⭐️ --- CÁLCULO DE PREÇO AJUSTADO (DEPOIS DOS DETALHES) ---
-total_itens = qtd_confra + qtd_copo
-qtd_criancas = sum(flags_crianca)
-qtd_confra_pagantes = qtd_confra - qtd_criancas # Subtrai a contagem das crianças
+# ⭐️ BLOCO 2: PERGUNTA E DETALHES SOBRE CRIANÇAS ADICIONAIS
+st.markdown("---")
+st.markdown("#### Crianças de até 12 anos (Grátis)")
+col_qtd_crianca, col_dummy = st.columns([1, 2])
 
-# Valida se há mais crianças marcadas do que ingressos comprados (erro de lógica)
-if qtd_confra_pagantes < 0:
-    st.error("⚠️ Erro de contagem: Há mais participantes marcados como crianças do que ingressos de Confra comprados. Por favor, verifique.")
-    st.stop()
+with col_qtd_crianca:
+    qtd_criancas = st.number_input(
+        "Quantas crianças de até 12 anos acompanham?",
+        min_value=0,
+        max_value=5, # Limitando a 5, mas você pode remover se quiser um limite maior
+        value=0,
+        step=1,
+        key="qtd_criancas_extras"
+    )
 
-# --- Cálculo de preço baseado APENAS em itens PAGANTES ---
-# A lógica agora aplica o desconto do Kit ao menor número entre Ingresso Pagante e Copo.
+flags_crianca_extras = [True] * qtd_criancas # Todas as flags são True
+
+if qtd_criancas > 0:
+    st.info("Por favor, preencha os dados de cada criança abaixo. O registro é obrigatório para entrada.")
+    for i in range(qtd_criancas):
+        with st.container(border=True):
+            st.markdown(f"**Dados da Criança Gratuita #{i+1}**")
+            col_nome, col_doc = st.columns(2)
+
+            with col_nome:
+                nome = st.text_input(f"Nome Completo (Criança {i+1})", key=f"nome_crianca_{i}")
+            with col_doc:
+                documento = st.text_input(f"Documento (RG/Certidão) (Criança {i+1})", key=f"doc_crianca_{i}")
+
+            nomes_criancas.append(nome)
+            documentos_criancas.append(documento)
+
+# ⭐️ --- CONSOLIDAÇÃO DE DADOS PARA O BANCO E CÁLCULO ---
+
+# As listas finais são a união dos adultos e crianças (na ordem: Adultos, depois Crianças)
+nomes_participantes = nomes_pagantes + nomes_criancas
+documentos_participantes = documentos_pagantes + documentos_criancas
+flags_crianca = flags_crianca_pagantes + flags_crianca_extras # [False, False, ..., True, True, ...]
+
+# A quantidade total de participantes (para fins de email) é:
+qtd_confra_total = qtd_confra_pagantes + qtd_criancas
+
+if qtd_copo > qtd_confra_pagantes:
+    st.warning("⚠️ Você selecionou mais Copos do que Ingressos Pagantes. Lembre-se que o desconto do kit é aplicado apenas aos ingressos pagantes.")
+
+
+# ⭐️ --- CÁLCULO DE PREÇO CORRIGIDO ---
+# O cálculo é baseado EXCLUSIVAMENTE em qtd_confra_pagantes e qtd_copo.
 
 # Encontra a quantidade de KITS que podem ser formados (Kit = 1 Ingresso Pagante + 1 Copo)
 qtd_kits = min(qtd_confra_pagantes, qtd_copo)
@@ -377,7 +412,7 @@ if qtd_kits > 0:
 elif qtd_confra_pagantes > 0 or qtd_copo > 0:
     tipo_compra = f"{qtd_confra_pagantes} Confra Pagante / {qtd_copo} Copo"
 else:
-    tipo_compra = "Apenas Crianças (Qtd Confra > 0, Pagante = 0)"
+    tipo_compra = "Apenas Copos / Apenas Crianças (Pagante = 0)"
 
 if qtd_criancas > 0:
     tipo_compra += f" ({qtd_criancas} Criança(s) Gratuita(s))"
@@ -389,11 +424,11 @@ st.divider()
 
 with st.form("finalizar_compra_form"):
     st.subheader("✉️ 3. Seus dados e forma de pagamento")
-    
+
     nome_comprador = st.text_input("Seu nome completo (Responsável pela Compra)")
     email_comprador = st.text_input("Seu melhor e-mail para contato")
     whatsapp_comprador = st.text_input("Seu WhatsApp (com DDD)", placeholder="Ex: 11987654321")
-    
+
     st.divider()
     st.markdown("#### **Escolha a forma de pagamento:**")
 
@@ -418,23 +453,26 @@ with st.form("finalizar_compra_form"):
             st.info("Após realizar o pagamento pelo link, anexe o comprovante logo abaixo.")
     else:
         st.error(f"Combinação de itens ({qtd_confra_pagantes} Pagante Confra, {qtd_copo} Copo) **inválida para gerar link de pagamento no cartão**. Por favor, utilize a opção **PIX**.")
-        
+
     st.divider()
     comprovante = st.file_uploader("Anexe o comprovante de pagamento aqui (seja do PIX ou do Link)", type=["png", "jpg", "jpeg", "pdf"])
-    
+
+    # Variável para desabilitar o botão se não houver nada comprado ou preenchido.
+    total_itens_para_validar = qtd_confra_pagantes + qtd_copo + qtd_criancas
+
     st.divider()
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         # Desabilita se não houver itens ou se o link for inválido
-        finalizar_btn = st.form_submit_button("✅ Finalizar Compra", use_container_width=True, disabled=(total_itens == 0))
+        finalizar_btn = st.form_submit_button("✅ Finalizar Compra", use_container_width=True, disabled=(total_itens_para_validar == 0))
     with col_btn2:
         # Desabilita se não houver itens ou se o link for inválido
-        nova_compra_btn = st.form_submit_button("🔄 Finalizar e Nova Compra", use_container_width=True, disabled=(total_itens == 0))
+        nova_compra_btn = st.form_submit_button("🔄 Finalizar e Nova Compra", use_container_width=True, disabled=(total_itens_para_validar == 0))
 
 # === Processamento da Compra ===
 if finalizar_btn or nova_compra_btn:
     erro = False
-    
+
     # ... [VALIAÇÃO DE NOMES DE COPO, COMPRADOR, ETC. (MANTIDA)] ...
 
     # ⭐️ VALIDAÇÃO DOS NOMES NO COPO (Múltiplos Nomes)
@@ -451,7 +489,7 @@ if finalizar_btn or nova_compra_btn:
                 erro = True
                 break
             nomes_copo_formatados.append(nome_limpo.upper())
-    
+
     # Validações existentes
     if not nome_comprador.strip():
         st.error("❌ Por favor, preencha seu nome completo.")
@@ -462,64 +500,75 @@ if finalizar_btn or nova_compra_btn:
     if not whatsapp_valido(whatsapp_comprador):
         st.error("❌ O número de WhatsApp é inválido. Por favor, insira o DDD + número.")
         erro = True
-    if qtd_confra > 0:
-        if any(not nome.strip() for nome in nomes_participantes):
-            st.error("❌ Preencha o nome de todos os participantes dos ingressos (incluindo crianças).")
+    if qtd_confra_pagantes > 0:
+        if any(not nome.strip() for nome in nomes_pagantes):
+            st.error("❌ Preencha o nome de todos os participantes dos ingressos pagantes.")
             erro = True
-        if any(not doc.strip() for doc in documentos_participantes):
-            st.error("❌ Preencha o documento de todos os participantes dos ingressos (incluindo crianças).")
+        if any(not doc.strip() for doc in documentos_pagantes):
+            st.error("❌ Preencha o documento de todos os participantes dos ingressos pagantes.")
             erro = True
-    
+
+    if qtd_criancas > 0:
+        if any(not nome.strip() for nome in nomes_criancas):
+            st.error("❌ Preencha o nome de todas as crianças (grátis).")
+            erro = True
+        if any(not doc.strip() for doc in documentos_criancas):
+            st.error("❌ Preencha o documento de todas as crianças (grátis).")
+            erro = True
+
     if not comprovante:
         st.error("❌ O comprovante de pagamento é obrigatório.")
         erro = True
-    if qtd_confra == 0 and qtd_copo == 0:
-        st.error("❌ A quantidade de itens deve ser maior que zero.")
+    if qtd_confra_pagantes == 0 and qtd_copo == 0 and qtd_criancas == 0:
+        st.error("❌ A quantidade de itens deve ser maior que zero (ou haver crianças).")
         erro = True
+
     # Validação do Link de Crédito (Se não houver link válido, não permite finalizar)
     if link_pagamento == '#' and ('Crédito' in st.session_state.get('forma_pagamento', '')): # Validação simples que pode falhar
         # Se for pix, não tem problema, mas se for crédito, tem que ter link
         # É mais seguro validar o PIX, mas como o campo de comprovante é genérico,
         # vamos confiar que o usuário usará o PIX se o link for inválido, e deixar o erro acima.
         pass 
-    
+
     if not erro:
-        # ⭐️ PREPARA AS LISTAS FINAIS PARA O BANCO DE DADOS
+        # ⭐️ PREPARA AS LISTAS FINAIS PARA O BANCO DE DADOS (USANDO flags_crianca)
         nomes_copo_final = ", ".join(nomes_copo_formatados) if qtd_copo > 0 else "N/A"
-        # Converte a lista de booleanos (True/False) para strings ('Sim'/'Não') para o DB/CSV
-        flags_crianca_str = ["Sim" if flag else "Não" for flag in flags_crianca]
-        
+        # Converte a lista de booleanos (True/False) para strings ('Sim'/'Não')
+        flags_crianca_str = ["Sim" if flag else "Não" for flag in flags_crianca] # Usa a lista final populada
+
         with st.spinner("Processando sua compra, por favor aguarde..."):
             try:
                 datahora = datetime.now().isoformat()
-                
+
                 # --- Salva no Supabase ---
                 dados_para_supabase = {
                     "nome_comprador": nome_comprador,
                     "email_comprador": email_comprador,
                     "whatsapp_comprador": whatsapp_comprador,
-                    "qtd_confra": qtd_confra, # Qtd. Bruta de participantes
+                    # Qtd. Bruta (Pagantes + Crianças) para refletir o total de pessoas
+                    "qtd_confra": qtd_confra_total, 
                     "qtd_copo": qtd_copo,
                     "nomes_copo": nomes_copo_final,
-                    "valor_pix": preco_pix, # ⭐️ Valor FINAL
-                    "valor_credito": preco_credito, # ⭐️ Valor FINAL
+                    "valor_pix": preco_pix, # Valor FINAL (calculado apenas com pagantes)
+                    "valor_credito": preco_credito, # Valor FINAL
                     "tipo_compra": tipo_compra,
                     "link_pagamento": link_pagamento if link_pagamento != '#' else "PIX",
-                    "nomes_participantes": ", ".join(nomes_participantes),
+                    # Listas consolidadas para o DB:
+                    "nomes_participantes": ", ".join(nomes_participantes), 
                     "documentos_participantes": ", ".join(documentos_participantes),
-                    "e_crianca": ", ".join(flags_crianca_str), # Novo campo salvo
+                    "e_crianca": ", ".join(flags_crianca_str), 
                     "created_at": datahora
                 }
                 supabase.table("compra_confra").insert(dados_para_supabase).execute()
 
                 # --- Gera CSV atualizado ---
                 caminho_csv = sincronizar_csv_com_supabase("compra_confra", arquivo_csv)
-                
+
                 # Prepara detalhes para o e-mail do ADMIN
-                detalhes_participantes_email = "\n".join([f"  - Participante {i+1}: Nome '{nomes_participantes[i]}', Doc. {documentos_participantes[i]}, Criança: {flags_crianca_str[i]}" for i in range(qtd_confra)])
-                
-                detalhes_copo_email = "\n".join([f"  - Copo {i+1}: Nome '{nome}'" for i, nome in enumerate(nomes_copo_formatados)])
-                
+                detalhes_participantes_email = "\n".join([f"  - Participante {i+1}: Nome '{nomes_participantes[i]}', Doc. {documentos_participantes[i]}, Criança: {flags_crianca_str[i]}" for i in range(qtd_confra_total)])
+
+                detalhes_copo_email = "\n".join([f"  - Copo {i+1}: Nome '{nome}'" for i, nome in enumerate(nomes_copo_formatados)])
+
                 # --- 1. Prepara e envia e-mail para o ADMINISTRADOR ---
                 destinatarios_admin = [d.strip() for d in EMAIL_DESTINATARIO.split(",")]
                 assunto_admin = f"Novo Pedido Confra Chapiuski 2025 - {nome_comprador}"
@@ -533,7 +582,7 @@ DADOS DO COMPRADOR:
 - Data/Hora: {datahora}
 
 DETALHES DO PEDIDO:
-- Qtd. Ingressos (Confra): {qtd_confra} ({qtd_confra_pagantes} Pagantes, {sum(flags_crianca)} Gratuitos)
+- Qtd. Ingressos (Confra): {qtd_confra} ({qtd_confra_pagantes} Pagantes, {qtd_criancas} Gratuitos)
 - Qtd. Copos Personalizados: {qtd_copo}
 - Tipo de Compra: {tipo_compra}
 - Valor PIX (FINAL): R$ {preco_pix:,.2f}
@@ -543,17 +592,17 @@ NOMES NOS COPOS:
 {detalhes_copo_email if qtd_copo > 0 else 'Nenhum copo comprado.'}
 
 PARTICIPANTES (Ingressos):
-{detalhes_participantes_email if qtd_confra > 0 else 'Nenhum ingresso de adulto comprado.'}
+{detalhes_participantes_email if qtd_confra_total > 0 else 'Nenhum participante registrado.'}
 
 O comprovante de pagamento e o CSV atualizado de todos os pedidos estão em anexo.
 Verifique o pagamento para confirmar o pedido.
 """
                 enviar_email_notificacao(EMAIL_REMETENTE, EMAIL_SENHA, destinatarios_admin, assunto_admin, corpo_admin, comprovante, caminho_csv)
-                
+
                 # --- 2. Prepara e envia e-mail para o COMPRADOR ---
                 primeiro_nome = nome_comprador.split()[0]
                 assunto_comprador = "✅ Pedido Confra Chapiuski 2025 Confirmado!"
-                
+
                 detalhes_itens = ""
                 if qtd_confra > 0:
                     detalhes_itens += f"<li><b>Ingressos Confra:</b> {qtd_confra} unidade(s) ({qtd_confra_pagantes} Pagantes)</li>"
@@ -562,7 +611,7 @@ Verifique o pagamento para confirmar o pedido.
                     detalhes_itens += f"<li><b>Copos Personalizados:</b> {qtd_copo} unidade(s){nomes_copo_html}</li>"
 
                 # Prepara detalhes para o e-mail do COMPRADOR (incluindo a flag)
-                detalhes_participantes_html = "".join([f"<li>Participante {i+1}: <b>{nomes_participantes[i]}</b> (Doc: {documentos_participantes[i]}) - **Criança (Até 12 anos): {flags_crianca_str[i]}**</li>" for i in range(qtd_confra)])
+                detalhes_participantes_html = "".join([f"<li>Participante {i+1}: <b>{nomes_participantes[i]}</b> (Doc: {documentos_participantes[i]}) - **Criança (Até 12 anos): {flags_crianca_str[i]}**</li>" for i in range(qtd_confra_total)])
 
                 corpo_comprador = f"""
                 <html>
@@ -582,14 +631,14 @@ Verifique o pagamento para confirmar o pedido.
 
                     <h3>Participantes Registrados (Obrigatório Documento na Entrada):</h3>
                     <ul style="list-style-type: none; padding-left: 0;">
-                        {detalhes_participantes_html if qtd_confra > 0 else '<li>Nenhum ingresso registrado.</li>'}
+                        {detalhes_participantes_html if qtd_confra_total > 0 else '<li>Nenhum participante registrado.</li>'}
                     </ul>
 
-                    <p>✅ **Valor Calculado:** O valor final de R$ {preco_pix:,.2f} (PIX) já inclui o desconto do(s) ingresso(s) gratuito(s) da(s) criança(s) indicada(s) acima.</p>
+                    <p>✅ **Valor Calculado:** O valor final de R$ {preco_pix:,.2f} (PIX) já reflete que as {qtd_criancas} criança(s) indicada(s) acima não pagam ingresso.</p>
                     <hr>
-                    <p>Obrigado por fazer parte da Confra!</p>
+                    <p>Obrigado! Você já faz parte da nossa história!</p>
                     <p><b>#ConfraChapiuski2025</b></p>
-                </body>
+                 </body>
                 </html>
                 """
                 enviar_email_para_comprador(EMAIL_REMETENTE, EMAIL_SENHA, email_comprador, assunto_comprador, corpo_comprador)
@@ -599,7 +648,7 @@ Verifique o pagamento para confirmar o pedido.
                     st.success(f"✅ Compra finalizada com sucesso! Obrigado, {primeiro_nome}!")
                     st.info("Seu pedido foi registrado. Verifique seu e-mail para o resumo da compra. A validação final será feita após a conferência do comprovante pela organização.")
                     st.balloons()
-                
+
                 elif nova_compra_btn:
                     # 1. Guarda a mensagem de sucesso na sessão
                     st.session_state.mensagem_sucesso = f"Pedido confirmado, {primeiro_nome}! Sua compra foi registrada com sucesso e está aguardando conferência do comprovante."
@@ -608,7 +657,7 @@ Verifique o pagamento para confirmar o pedido.
                     chaves_para_limpar = [key for key in st.session_state.keys() if key != 'mensagem_sucesso']
                     for key in chaves_para_limpar:
                         del st.session_state[key]
-        
+
                     # 3. Força o recarregamento da página. A mensagem será exibida no topo.
                     st.rerun()
 
