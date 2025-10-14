@@ -198,7 +198,8 @@ except Exception:
 st.divider()
 
 st.info(f"""
-    **📅 Data:** 06/12/2025 | **⏰ Horário:** 16h às 22h | **📍 Local:** Penha Society  
+    **📅 Data:** 06/12/2025 | **⏰ Horário:** 16h às 22h  
+    **📍 Local:** Penha Society  
     **⚠️ Vendas:** De 15/10/2025 até 20/11/2025.
 """)
 
