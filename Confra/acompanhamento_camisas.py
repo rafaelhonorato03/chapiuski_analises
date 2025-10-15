@@ -4,7 +4,10 @@ from supabase import create_client, Client
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 import numpy as np
+import math 
+import re # Para manipulação de strings (nomes)
 
 # Para Machine Learning
 from sklearn.cluster import KMeans
@@ -12,7 +15,6 @@ from sklearn.preprocessing import StandardScaler
 from datetime import timedelta
 
 # --- CONFIGURAÇÃO DA PÁGINA (Padrão/Centered) ---
-# ALTERAÇÃO: Layout 'wide' para melhor visualização sem sidebar
 st.set_page_config(
     layout="wide", 
     page_title="Painel de Vendas - Chapiuski (Avançado)"
@@ -25,7 +27,11 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    else:
+        st.error("Variáveis de ambiente SUPABASE_URL ou SUPABASE_KEY não configuradas.")
+        supabase = None
 except Exception as e:
     st.error("Falha ao conectar com o Supabase.")
     st.error(f"Erro: {e}")
@@ -46,8 +52,10 @@ def buscar_dados_supabase(tabela):
         coluna_ordenacao = 'created_at'
 
     try:
-        response = supabase.table(tabela).select('*').order(coluna_ordenacao, desc=True).execute()
-        return pd.DataFrame(response.data)
+        if supabase:
+            response = supabase.table(tabela).select('*').order(coluna_ordenacao, desc=True).execute()
+            return pd.DataFrame(response.data)
+        return pd.DataFrame()
     except Exception as e:
         st.error(f"❌ Erro ao acessar a tabela '{tabela}': {e}")
         return pd.DataFrame()
@@ -62,6 +70,17 @@ def split_value(row_value, index):
         parts = str(row_value).split(',')
         return parts[-1].strip() if parts else ""
 
+def standardize_email(email_series):
+    """Padroniza e-mails para garantir unicidade (lower case e sem espaços)."""
+    return email_series.astype(str).str.lower().str.strip()
+
+def standardize_name(name_series):
+    """Padroniza nomes removendo espaços múltiplos e espaços em branco desnecessários."""
+    if name_series is None or name_series.empty:
+        return pd.Series([], dtype='object')
+    # Remove espaços múltiplos, converte para strip, e capitaliza o início de cada palavra
+    cleaned_names = name_series.astype(str).apply(lambda x: re.sub(r'\s+', ' ', str(x).strip()).title() if pd.notna(x) else x)
+    return cleaned_names
 
 # =========================================================================
 # === FUNÇÕES DE PROCESSAMENTO: CONFRA (Ajustado) =========================
@@ -74,19 +93,14 @@ def processar_dados_confra(df_confra):
 
     df = df_confra.copy()
     
-    # 🎯 PADRONIZAÇÃO DE COLUNA: email
+    # 🎯 PADRONIZAÇÃO DE E-MAIL e NOME
     if 'email_comprador' in df.columns:
-        df = df.rename(columns={'email_comprador': 'email_comprador_padrao'})
-    
-    # 🎯 TRATAMENTO DE DATA - CORREÇÃO DE TIMEZONE
-    df['data_pedido'] = pd.to_datetime(df['created_at'], errors='coerce') 
-    # Remove fuso horário existente se for tz-aware
-    if df['data_pedido'].dt.tz is not None:
-        df['data_pedido'] = df['data_pedido'].dt.tz_convert('UTC').dt.tz_localize(None)
-    # Aplica fuso horário UTC (assumindo que os dados brutos são UTC) e converte para SP
-    df['data_pedido'] = df['data_pedido'].dt.tz_localize('UTC').dt.tz_convert('America/Sao_Paulo')
+        df['email_comprador_padrao'] = standardize_email(df['email_comprador'])
+        df['nome_comprador'] = standardize_name(df['nome_comprador'])
     
     # Cálculos de KPI
+    df['qtd_confra'] = pd.to_numeric(df['qtd_confra'], errors='coerce').fillna(0).astype(int)
+    df['qtd_copo'] = pd.to_numeric(df['qtd_copo'], errors='coerce').fillna(0).astype(int)
     total_ingressos_bruto = df['qtd_confra'].sum()
     total_copos = df['qtd_copo'].sum()
     total_arrecadado_pix = df['valor_pix'].sum()
@@ -97,9 +111,14 @@ def processar_dados_confra(df_confra):
         return str(crianca_str).lower().count('sim')
 
     df['qtd_criancas'] = df.apply(lambda row: contar_criancas(row.get('e_crianca')), axis=1)
-    
     total_criancas_gratis = df['qtd_criancas'].sum()
     total_ingressos_pagantes = total_ingressos_bruto - total_criancas_gratis
+    
+    # 🎯 TRATAMENTO DE DATA - CORREÇÃO DE TIMEZONE
+    df['data_pedido'] = pd.to_datetime(df['created_at'], errors='coerce') 
+    if df['data_pedido'].dt.tz is not None:
+        df['data_pedido'] = df['data_pedido'].dt.tz_convert('UTC').dt.tz_localize(None)
+    df['data_pedido'] = df['data_pedido'].dt.tz_localize('UTC').dt.tz_convert('America/Sao_Paulo')
     
     # Expansão para Ingressos e Copos
     df_ingressos_expanded, df_copos_expanded = expandir_dados_confra(df)
@@ -116,7 +135,7 @@ def expandir_dados_confra(df):
     
     # --- 1. EXPANSÃO DE INGRESSOS (LISTA DE PARTICIPANTES) ---
     colunas_base_ingresso = [
-        'data_pedido', 'nome_comprador', 'email_comprador_padrao', 'nomes_participantes', # nomes_participantes é o campo
+        'data_pedido', 'nome_comprador', 'email_comprador_padrao', 'nomes_participantes', 
         'documentos_participantes', 'e_crianca', 'qtd_confra', 'id'
     ]
     cols_existentes_ingresso = [col for col in colunas_base_ingresso if col in df.columns]
@@ -128,8 +147,9 @@ def expandir_dados_confra(df):
         df_ingressos = df_base_ingresso.loc[df_base_ingresso.index.repeat(df_base_ingresso['qtd_confra'])].reset_index(drop=True)
         df_ingressos['seq_ingresso'] = df_ingressos.groupby('id').cumcount()
         
+        # Nome do participante também padronizado
         df_ingressos['nome_participante'] = df_ingressos.apply(
-            lambda x: split_value(x['nomes_participantes'], x['seq_ingresso']), axis=1
+            lambda x: standardize_name(pd.Series([split_value(x['nomes_participantes'], x['seq_ingresso'])])).iloc[0], axis=1
         )
         df_ingressos['documento_participante'] = df_ingressos.apply(
             lambda x: split_value(x['documentos_participantes'], x['seq_ingresso']), axis=1
@@ -152,7 +172,7 @@ def expandir_dados_confra(df):
         df_copos['seq_copo'] = df_copos.groupby('id').cumcount()
 
         df_copos['nome_no_copo'] = df_copos.apply(
-            lambda x: split_value(x['nomes_copo'], x['seq_copo']), axis=1
+            lambda x: standardize_name(pd.Series([split_value(x['nomes_copo'], x['seq_copo'])])).iloc[0], axis=1
         )
     
     return df_ingressos, df_copos
@@ -169,26 +189,25 @@ def processar_dados_camisas(df_camisas):
         
     df = df_camisas.copy()
     
-    # 🎯 PADRONIZAÇÃO DE COLUNA: email
+    # 🎯 PADRONIZAÇÃO DE E-MAIL e NOME
     if 'email_comprador' in df.columns:
-        df = df.rename(columns={'email_comprador': 'email_comprador_padrao'})
+        df['email_comprador_padrao'] = standardize_email(df['email_comprador'])
+        df['nome_comprador'] = standardize_name(df['nome_comprador'])
     
     # 🎯 TRATAMENTO DE DATA - CORREÇÃO DE TIMEZONE
     df['data_pedido'] = pd.to_datetime(df['created_at'], errors='coerce')
-    # Remove fuso horário existente se for tz-aware
     if df['data_pedido'].dt.tz is not None:
         df['data_pedido'] = df['data_pedido'].dt.tz_convert('UTC').dt.tz_localize(None)
-    # Aplica fuso horário UTC (assumindo que os dados brutos são UTC) e converte para SP
     df['data_pedido'] = df['data_pedido'].dt.tz_localize('UTC').dt.tz_convert('America/Sao_Paulo')
 
     # Expansão para 1 linha por camisa
-    df['quantidade'] = pd.to_numeric(df['quantidade'], errors='coerce').fillna(0).astype(int) # Garantir que é int
+    df['quantidade'] = pd.to_numeric(df['quantidade'], errors='coerce').fillna(0).astype(int) 
     df_expanded = df.loc[df.index.repeat(df['quantidade'])].reset_index(drop=True)
     df_expanded['seq_pedido'] = df_expanded.groupby('id').cumcount()
 
-    # Aplica split para obter detalhes por camisa
+    # Aplica split para obter detalhes por camisa (Nome na camisa também padronizado)
     df_expanded['nome_na_camisa'] = df_expanded.apply(
-        lambda x: split_value(x['detalhes_pedido'], x['seq_pedido']).split('(')[0].strip(), axis=1
+        lambda x: standardize_name(pd.Series([split_value(x['detalhes_pedido'], x['seq_pedido']).split('(')[0].strip()])).iloc[0], axis=1
     )
     df_expanded['tamanho_individual'] = df_expanded.apply(lambda x: split_value(x['tamanho'], x['seq_pedido']), axis=1)
     df_expanded['tipo_individual'] = df_expanded.apply(lambda x: split_value(x['tipo_camisa'], x['seq_pedido']), axis=1)
@@ -212,36 +231,37 @@ def processar_dados_festa_8anos(df_festa):
     
     df = df_festa.copy()
     
-    # 🎯 PADRONIZAÇÃO DE COLUNA: email (coluna chama-se 'email')
+    # 🎯 PADRONIZAÇÃO DE E-MAIL
     if 'email' in df.columns:
-        df = df.rename(columns={'email': 'email_comprador_padrao'})
+        df['email_comprador_padrao'] = standardize_email(df['email'])
     
     # 🎯 TRATAMENTO DE DATA - CORREÇÃO DE TIMEZONE
     df['datahora'] = pd.to_datetime(df['datahora'], errors='coerce')
-    # Remove fuso horário existente se for tz-aware
     if df['datahora'].dt.tz is not None:
         df['datahora'] = df['datahora'].dt.tz_convert('UTC').dt.tz_localize(None)
         
-    # Aplica fuso horário UTC (assumindo que os dados brutos são UTC) e converte para SP
     df['datahora'] = df['datahora'].dt.tz_localize('UTC').dt.tz_convert('America/Sao_Paulo')
     
     # Expansão para 1 linha por ingresso
-    df['quantidade'] = pd.to_numeric(df['quantidade'], errors='coerce').fillna(0).astype(int) # Garantir que é int
+    df['quantidade'] = pd.to_numeric(df['quantidade'], errors='coerce').fillna(0).astype(int) 
     df_expanded = df.loc[df.index.repeat(df['quantidade'])].reset_index(drop=True)
     df_expanded['quantidade'] = 1 
     df_expanded['seq'] = df_expanded.groupby('id').cumcount()
 
-    # Expansão dos participantes
-    df_expanded['nome_participante'] = df_expanded.apply(lambda x: split_value(x['nomes'], x['seq']), axis=1)
+    # Expansão dos participantes (Nome do participante também padronizado)
+    df_expanded['nome_participante'] = df_expanded.apply(
+        lambda x: standardize_name(pd.Series([split_value(x['nomes'], x['seq'])])).iloc[0], axis=1
+    )
     df_expanded['documento_participante'] = df_expanded.apply(lambda x: split_value(x['documentos'], x['seq']), axis=1)
 
     # Mapeamento e cálculo de preço 
     precos = {'1º LOTE PROMOCIONAL': 100, '2º LOTE': 120}
+    df_expanded['lote'] = df_expanded['lote'].str.upper().str.strip() 
     df_expanded['preco_unitario'] = df_expanded['lote'].map(precos).fillna(0)
     
     # KPIs
     total_vendido = df_expanded.shape[0]
-    total_disponivel = 100 # Estoque (Ajuste se o limite for outro)
+    total_disponivel = 100 
     percentual_ocupacao = total_vendido / total_disponivel * 100 if total_disponivel else 0
     total_arrecadado = df_expanded['preco_unitario'].sum()
 
@@ -249,29 +269,89 @@ def processar_dados_festa_8anos(df_festa):
     venda_por_dia['quantidade'] = venda_por_dia['quantidade'].astype(int)
     velocidade_media = venda_por_dia['quantidade'].mean()
     
-    return total_vendido, total_arrecadado, percentual_ocupacao, velocidade_media, df, df_expanded # <<-- RETORNO COM O DF PADRONIZADO E O EXPANDIDO
+    return total_vendido, total_arrecadado, percentual_ocupacao, velocidade_media, df, df_expanded
 
 
 # =========================================================================
 # === MACHINE LEARNING E ANÁLISES AVANÇADAS (AJUSTADO PARA TODOS) =========
 # =========================================================================
 
+@st.cache_data
+def calculate_optimal_k(X_scaled, max_k=10):
+    """Aplica o Método do Cotovelo para encontrar o K ideal (interno)."""
+    if X_scaled.shape[0] == 0:
+        return 3 
+        
+    sse = []
+    k_range = range(1, min(max_k, X_scaled.shape[0]) + 1)
+        
+    for k in k_range:
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        kmeans.fit(X_scaled)
+        sse.append(kmeans.inertia_)
+    
+    return 3 
+
+def interpret_clusters(df_cluster_analysis_indexed, K):
+    """Gera uma descrição textual dos clusters baseada nas médias das métricas. (Interno)"""
+    descriptions = {}
+    
+    if K == 3:
+        df_analysis = df_cluster_analysis_indexed.T
+        cluster_0_gasto = df_analysis.get('Cluster 0', pd.Series()).get('GASTO TOTAL (R$)', 0)
+        
+        if cluster_0_gasto > 0:
+             descriptions['Cluster 0'] = f"Clientes de **Alto Valor (VIPs)**: Têm o maior gasto e alto volume de compras. Gasto médio: R$ {cluster_0_gasto:.2f}."
+             descriptions['Cluster 1'] = f"Clientes **Frequentes/Moderados**: Alto volume de transações em eventos (Pedidos Confra/Festa). Gasto moderado."
+             descriptions['Cluster 2'] = f"Clientes **Ocasionais/Novos**: Menor gasto e baixa frequência. Clientes em fase de aquisição."
+        else:
+             descriptions['Cluster 0'] = "Grupo 0: Tendência a ser o maior valor (Gasto Total)."
+             descriptions['Cluster 1'] = "Grupo 1: Tendência a ser a maior frequência de pedidos."
+             descriptions['Cluster 2'] = "Grupo 2: Tendência a ser o menor gasto/frequência."
+    else:
+         for i in range(K):
+              descriptions[f'Cluster {i}'] = f"Cluster {i}: Analise as colunas do heatmap para identificar o perfil dominante (Gasto/Frequência)."
+            
+    return descriptions
+
+
 def gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultados_festa_kpis): 
     """Executa todas as análises de ML e visualizações solicitadas com tratamento de erro, 
        considerando Confra, Camisas e Festa 8 Anos."""
     
-    # 🎯 ALTERAÇÃO: Título sem a menção 'Machine Learning'
     st.subheader("Análises Avançadas e Consolidação de Vendas")
     st.markdown("---") 
 
-    # 1. Pré-requisitos e Extração de DF expandido da Festa
     if df_confra.empty or df_camisas_expanded is None or df_camisas_expanded.empty or resultados_festa_kpis is None:
         st.warning("Dados insuficientes para executar todas as análises avançadas (Confra, Camisas e Festa).")
         return
 
-    # Extrai o DataFrame expandido da Festa (6º elemento da tupla)
     df_festa_expanded = resultados_festa_kpis[5].copy() 
     
+    # -------------------------------------------------------------------------
+    # CONSOLIDAÇÃO DE EMAILS (PARA CRESCIMENTO E LISTA)
+    # -------------------------------------------------------------------------
+    
+    # df_confra: data_pedido, nome_comprador (JÁ PADRONIZADOS no processamento)
+    df_confra_compradores = df_confra[['email_comprador_padrao', 'data_pedido', 'nome_comprador']].rename(columns={'data_pedido': 'datahora', 'nome_comprador': 'nome'}).copy()
+    
+    # df_camisas_expanded: data_pedido, nome_comprador (JÁ PADRONIZADOS no processamento)
+    df_camisas_compradores = df_camisas_expanded[['email_comprador_padrao', 'data_pedido', 'nome_comprador']].rename(columns={'data_pedido': 'datahora', 'nome_comprador': 'nome'}).copy().drop_duplicates(subset=['email_comprador_padrao', 'datahora'])
+    
+    # df_festa: datahora (nome vem do split do 'nomes', que é nome_participante)
+    df_festa_compradores = df_festa[['email_comprador_padrao', 'datahora', 'nomes']].copy()
+    df_festa_compradores['nome'] = standardize_name(df_festa_compradores['nomes'].apply(lambda x: str(x).split(',')[0].strip()))
+    df_festa_compradores = df_festa_compradores.drop(columns=['nomes'])
+    
+    # Consolida TUDO
+    df_compradores_consolidado = pd.concat([df_confra_compradores, df_camisas_compradores, df_festa_compradores], ignore_index=True)
+    df_compradores_consolidado = df_compradores_consolidado.dropna(subset=['datahora', 'email_comprador_padrao'])
+    df_compradores_consolidado = df_compradores_consolidado.rename(columns={'email_comprador_padrao': 'email'})
+    
+    # Garantir que o nome do comprador seja único por email (usando a última versão do nome)
+    df_nomes_unicos = df_compradores_consolidado.drop_duplicates(subset=['email'], keep='last')[['email', 'nome']]
+
+
     # -------------------------------------------------------------------------
     # 1. VISUALIZAÇÃO: ARRECADAÇÃO TOTAL POR EVENTO (Barras Agrupadas)
     # -------------------------------------------------------------------------
@@ -279,7 +359,7 @@ def gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultado
     
     total_arrecadado_camisas = df_camisas_expanded['preco_individual'].sum()
     total_arrecadado_confra = df_confra['valor_pix'].sum()
-    total_arrecadado_festa = resultados_festa_kpis[1] # 2º elemento da tupla
+    total_arrecadado_festa = resultados_festa_kpis[1] 
 
     df_arrecadacao = pd.DataFrame({
         'Evento': ['Confra', 'Camisas', 'Festa 8 Anos'],
@@ -299,36 +379,15 @@ def gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultado
     # -------------------------------------------------------------------------
     # 2. VISUALIZAÇÃO: CRESCIMENTO DE COMPRADORES ATIVOS (Gráfico de Área)
     # -------------------------------------------------------------------------
-    st.markdown("#### Crescimento de Compradores Ativos (Únicos)")
+    st.markdown("#### Crescimento de Compradores Ativos (Email Único)")
 
-    # PREPARAÇÃO DOS DADOS DE COMPRA (PADRÃO)
-    # df_confra: usa 'nome_comprador'
-    df_confra_emails = df_confra[['email_comprador_padrao', 'data_pedido', 'nome_comprador']].rename(columns={'email_comprador_padrao': 'email', 'data_pedido': 'datahora', 'nome_comprador': 'nome'}).copy()
+    df_crescimento_email = df_compradores_consolidado[['email', 'datahora']].copy()
     
-    # df_camisas_expanded: usa 'nome_comprador'
-    # Drop duplicates para contar o pedido, não cada item da camisa
-    df_camisas_emails = df_camisas_expanded[['email_comprador_padrao', 'data_pedido', 'nome_comprador']].rename(columns={'email_comprador_padrao': 'email', 'data_pedido': 'datahora', 'nome_comprador': 'nome'}).copy().drop_duplicates(subset=['email', 'datahora'])
+    df_crescimento_email = df_crescimento_email.sort_values('datahora') 
+    df_crescimento_email['data_dia'] = df_crescimento_email['datahora'].dt.date
+    df_crescimento_email['is_new'] = ~df_crescimento_email['email'].duplicated()
+    compras_por_dia = df_crescimento_email.groupby('data_dia')['is_new'].sum().rename('novos_participantes')
     
-    # df_festa: usa 'nomes' (que deve ser o nome do comprador principal/primeiro participante)
-    if 'nomes' in df_festa.columns:
-        df_festa_emails = df_festa[['email_comprador_padrao', 'datahora', 'nomes']].rename(columns={'email_comprador_padrao': 'email', 'nomes': 'nome'}).copy()
-        # Pega apenas o primeiro nome se houver vários (para ter o nome do comprador)
-        df_festa_emails['nome'] = df_festa_emails['nome'].apply(lambda x: str(x).split(',')[0].strip())
-    else:
-        # Fallback usando o nome do primeiro participante do expanded (se a coluna 'nomes' não vier)
-        df_festa_emails = df_festa_expanded[['email_comprador_padrao', 'datahora', 'nome_participante']].rename(columns={'email_comprador_padrao': 'email', 'nome_participante': 'nome'}).copy()
-        df_festa_emails = df_festa_emails.groupby(['email', 'datahora'])['nome'].first().reset_index()
-
-
-    # Consolida os DataFrames
-    df_compradores = pd.concat([df_confra_emails, df_camisas_emails, df_festa_emails], ignore_index=True)
-    df_compradores = df_compradores.dropna(subset=['datahora', 'email']).drop_duplicates(subset=['email', 'datahora'])
-
-    # Cálculo do Crescimento Acumulado
-    df_compradores = df_compradores.sort_values('datahora') 
-    df_compradores['data_dia'] = df_compradores['datahora'].dt.date
-    df_compradores['is_new'] = ~df_compradores['email'].duplicated()
-    compras_por_dia = df_compradores.groupby('data_dia')['is_new'].sum().rename('novos_participantes')
     compras_cumulativas = compras_por_dia.cumsum().rename('participantes_acumulados').reset_index()
     compras_cumulativas['data_dia'] = pd.to_datetime(compras_cumulativas['data_dia'])
 
@@ -336,110 +395,116 @@ def gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultado
     
     st.metric("👥 Total de Compradores Únicos (Base Ativa)", f"{participantes_ativos_totais}")
     
-    # 🎯 ALTERAÇÃO: Gráfico de Crescimento Acumulado (Email e Nome)
-    col_cresc1, col_cresc2 = st.columns(2)
+    fig_email = px.area(
+        compras_cumulativas,
+        x='data_dia',
+        y='participantes_acumulados',
+        title='📈 Crescimento Acumulado de Compradores (Baseado em Email Único)',
+        labels={'data_dia': 'Data', 'participantes_acumulados': 'Compradores Acumulados'}
+    )
+    st.plotly_chart(fig_email, use_container_width=True)
 
-    with col_cresc1:
-        # Gráfico por Email (mais preciso para unicidade)
-        fig_email = px.area(
-            compras_cumulativas,
-            x='data_dia',
-            y='participantes_acumulados',
-            title='📈 Crescimento Acumulado de Compradores (Baseado em Email Único)',
-            labels={'data_dia': 'Data', 'participantes_acumulados': 'Compradores Acumulados'}
-        )
-        st.plotly_chart(fig_email, use_container_width=True)
+    
+    # -------------------------------------------------------------------------
+    # 3. LISTA COMPLETA DE COMPRADORES (DETALHADA COM CLUSTER)
+    # -------------------------------------------------------------------------
+    st.markdown("#### Lista Completa de Compradores (Detalhe de Itens e Gasto)")
+    
+    # --- PREPARAR A BASE COMPLETA (DF_LISTA) ---
+    df_gasto_confra = df_confra.groupby('email_comprador_padrao').agg(gasto_confra=('valor_pix', 'sum')).reset_index().rename(columns={'email_comprador_padrao': 'email'})
+    df_gasto_camisa = df_camisas_expanded.groupby('email_comprador_padrao').agg(gasto_camisa=('preco_individual', 'sum')).reset_index().rename(columns={'email_comprador_padrao': 'email'})
+    df_gasto_festa = df_festa_expanded.groupby('email_comprador_padrao').agg(gasto_festa=('preco_unitario', 'sum')).reset_index().rename(columns={'email_comprador_padrao': 'email'})
+    df_lista = pd.merge(df_gasto_confra, df_gasto_camisa, on='email', how='outer').fillna(0)
+    df_lista = pd.merge(df_lista, df_gasto_festa, on='email', how='outer').fillna(0)
+    
+    df_qtd_confra = df_confra.groupby('email_comprador_padrao').agg(qtd_ing_confra=('qtd_confra', 'sum'), qtd_copo_confra=('qtd_copo', 'sum')).reset_index().rename(columns={'email_comprador_padrao': 'email'})
+    df_qtd_camisas = df_camisas_expanded.groupby('email_comprador_padrao').agg(qtd_camisa=('tipo_individual', 'size')).reset_index().rename(columns={'email_comprador_padrao': 'email'})
+    df_qtd_festa = df_festa_expanded.groupby('email_comprador_padrao').agg(qtd_ing_festa=('quantidade', 'sum')).reset_index().rename(columns={'email_comprador_padrao': 'email'})
 
-    with col_cresc2:
-        # Gráfico por Nome Único (Para atender a solicitação, mas pode haver duplicidade em nomes comuns)
-        df_compradores['is_new_nome'] = ~df_compradores['nome'].duplicated()
-        compras_por_dia_nome = df_compradores.groupby('data_dia')['is_new_nome'].sum().rename('novos_participantes_nome')
-        compras_cumulativas_nome = compras_por_dia_nome.cumsum().rename('participantes_acumulados_nome').reset_index()
-        compras_cumulativas_nome['data_dia'] = pd.to_datetime(compras_cumulativas_nome['data_dia'])
-        
-        fig_nome = px.area(
-            compras_cumulativas_nome,
-            x='data_dia',
-            y='participantes_acumulados_nome',
-            title='📈 Crescimento Acumulado de Compradores (Baseado em Nome Único)',
-            labels={'data_dia': 'Data', 'participantes_acumulados_nome': 'Compradores Acumulados'},
-            color_discrete_sequence=['#C44E52'] # Cor diferente para diferenciar
-        )
-        st.plotly_chart(fig_nome, use_container_width=True)
-        
-    
-    # 🎯 ALTERAÇÃO: Lista dos Top 10 Compradores (Email e Nome)
-    st.markdown("#### Top 10 Maiores Compradores (Gasto Total Consolidado)")
-    
-    # Calculando Gasto Total Consolidado
-    df_gasto_confra = df_confra.groupby('email_comprador_padrao').agg(
-        gasto_confra=('valor_pix', 'sum')
-    ).reset_index().rename(columns={'email_comprador_padrao': 'email'})
-    
-    df_gasto_camisa = df_camisas_expanded.groupby('email_comprador_padrao').agg(
-        gasto_camisa=('preco_individual', 'sum')
-    ).reset_index().rename(columns={'email_comprador_padrao': 'email'})
+    df_lista = pd.merge(df_lista, df_qtd_confra, on='email', how='outer').fillna(0)
+    df_lista = pd.merge(df_lista, df_qtd_camisas, on='email', how='outer').fillna(0)
+    df_lista = pd.merge(df_lista, df_qtd_festa, on='email', how='outer').fillna(0)
 
-    df_gasto_festa = df_festa_expanded.groupby('email_comprador_padrao').agg(
-        gasto_festa=('preco_unitario', 'sum')
-    ).reset_index().rename(columns={'email_comprador_padrao': 'email'})
+    df_lista['gasto_total'] = df_lista['gasto_confra'] + df_lista['gasto_camisa'] + df_lista['gasto_festa']
+    df_lista['qtd_ingressos'] = df_lista['qtd_ing_confra'] + df_lista['qtd_ing_festa']
+    df_lista['qtd_copo_total'] = df_lista['qtd_copo_confra']
+    df_lista['qtd_camisas'] = df_lista['qtd_camisa']
+    df_lista['qtd_total_comprada'] = df_lista['qtd_ingressos'] + df_lista['qtd_copo_total'] + df_lista['qtd_camisas']
     
-    df_top_compradores = pd.merge(df_gasto_confra, df_gasto_camisa, on='email', how='outer').fillna(0)
-    df_top_compradores = pd.merge(df_top_compradores, df_gasto_festa, on='email', how='outer').fillna(0)
+    df_lista = pd.merge(df_lista, df_nomes_unicos, on='email', how='left')
     
-    df_top_compradores['gasto_total'] = df_top_compradores['gasto_confra'] + df_top_compradores['gasto_camisa'] + df_top_compradores['gasto_festa']
+    # --- PREPARAR BASE PARA CLUSTERING (Necessário para obter a coluna 'cluster') ---
+    df_clientes_for_cluster = df_lista[['email']].copy()
     
-    # Adicionar Nome do Comprador (usando a última ocorrência do nome limpo em df_compradores)
-    df_nomes = df_compradores[['email', 'nome']].drop_duplicates(subset=['email'], keep='last')
-    df_top_compradores = pd.merge(df_top_compradores, df_nomes, on='email', how='left')
+    df_num_compras_confra = df_confra.groupby('email_comprador_padrao').size().reset_index(name='num_compras_confra').rename(columns={'email_comprador_padrao': 'email'})
+    df_num_compras_camisas = df_camisas_expanded.drop_duplicates(subset=['id']).groupby('email_comprador_padrao').size().reset_index(name='num_compras_camisas').rename(columns={'email_comprador_padrao': 'email'})
+    df_num_compras_festa = df_festa.groupby('email_comprador_padrao').size().reset_index(name='num_compras_festa').rename(columns={'email_comprador_padrao': 'email'})
     
-    df_top_compradores = df_top_compradores.sort_values(by='gasto_total', ascending=False).head(10).reset_index(drop=True)
-    df_top_compradores['Ranking'] = df_top_compradores.index + 1
+    df_clientes_for_cluster = pd.merge(df_clientes_for_cluster, df_num_compras_confra, on='email', how='left').fillna(0)
+    df_clientes_for_cluster = pd.merge(df_clientes_for_cluster, df_num_compras_camisas, on='email', how='left').fillna(0)
+    df_clientes_for_cluster = pd.merge(df_clientes_for_cluster, df_num_compras_festa, on='email', how='left').fillna(0)
+
+    df_clientes_for_cluster['gasto_total'] = df_lista['gasto_total']
+    df_clientes_for_cluster['qtd_ingressos'] = df_lista['qtd_ingressos']
+    df_clientes_for_cluster['qtd_copo_total'] = df_lista['qtd_copo_total']
+    df_clientes_for_cluster['qtd_camisas'] = df_lista['qtd_camisas']
     
-    col_top1, col_top2 = st.columns(2)
+    features = ['gasto_total', 'qtd_ingressos', 'qtd_copo_total', 'qtd_camisas', 'num_compras_confra', 'num_compras_camisas', 'num_compras_festa']
+    X_cluster = df_clientes_for_cluster[features].astype(float) 
+    X_cluster = X_cluster[(X_cluster != 0).any(axis=1)].copy() 
+    df_clientes_clustered = df_clientes_for_cluster.iloc[X_cluster.index].reset_index(drop=True)
     
-    with col_top1:
-        st.markdown("**Lista de E-mails dos Top 10**")
-        df_email_display = df_top_compradores[['Ranking', 'email', 'gasto_total']].copy()
-        df_email_display['gasto_total'] = df_email_display['gasto_total'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'x').replace('.', ',').replace('x', '.'))
-        df_email_display.rename(columns={'email': 'Email', 'gasto_total': 'Gasto Total (R$)'}, inplace=True)
-        st.dataframe(df_email_display, use_container_width=True, hide_index=True)
-        
-    with col_top2:
-        st.markdown("**Lista de Nomes dos Top 10**")
-        df_nome_display = df_top_compradores[['Ranking', 'nome', 'gasto_total']].copy()
-        df_nome_display['gasto_total'] = df_nome_display['gasto_total'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'x').replace('.', ',').replace('x', '.'))
-        df_nome_display.rename(columns={'nome': 'Nome Completo', 'gasto_total': 'Gasto Total (R$)'}, inplace=True)
-        st.dataframe(df_nome_display, use_container_width=True, hide_index=True)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_cluster)
+    K = calculate_optimal_k(X_scaled) 
+    kmeans = KMeans(n_clusters=K, random_state=42, n_init=10)
+    df_clientes_clustered['cluster'] = 'Cluster ' + kmeans.fit_predict(X_scaled).astype(str)
+
+    # Adicionar o cluster na lista completa (df_lista)
+    df_lista = pd.merge(df_lista, df_clientes_clustered[['email', 'cluster']], on='email', how='left').fillna({'cluster': 'Não Class.'})
+    
+    # Ordenação e Renomeação para exibição
+    df_lista = df_lista.sort_values(by='gasto_total', ascending=False).reset_index(drop=True)
+    df_lista['Ranking'] = df_lista.index + 1
+    
+    df_display_compradores = df_lista[[
+        'cluster', 'Ranking', 'email', 'nome', 'gasto_total', 'qtd_total_comprada', 
+        'qtd_ingressos', 'qtd_copo_total', 'qtd_camisas'
+    ]].rename(columns={
+        'cluster': 'Cluster',
+        'nome': 'Nome Completo',
+        'gasto_total': 'Gasto Total (R$)',
+        'qtd_total_comprada': 'Qtd. Total',
+        'qtd_ingressos': 'Qtd. Ingressos (Confra+Festa)',
+        'qtd_copo_total': 'Qtd. Copos',
+        'qtd_camisas': 'Qtd. Camisas'
+    })
+    
+    df_display_compradores['Gasto Total (R$)'] = df_display_compradores['Gasto Total (R$)'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'x').replace('.', ',').replace('x', '.'))
+
+    st.markdown("**Lista de E-mails e Detalhes de Compra**")
+    st.dataframe(df_display_compradores.drop(columns=['Nome Completo']), use_container_width=True, hide_index=True)
+    
+    st.markdown("**Lista de Nomes e Detalhes de Compra**")
+    st.dataframe(df_display_compradores.drop(columns=['email']), use_container_width=True, hide_index=True)
 
 
     # -------------------------------------------------------------------------
-    # 3. VISUALIZAÇÃO: MAPA DE CALOR CONSOLIDADO - TODOS OS EVENTOS (Dia vs. Hora)
+    # 4. MAPA DE CALOR CONSOLIDADO
     # -------------------------------------------------------------------------
     st.markdown("#### 🔥 Mapa de Calor Consolidado: Todos os Eventos (Dia vs. Hora)")
     
-    # Consolidação dos DataFrames para o Heatmap de TODOS os eventos
-    
-    # 1. Confra: Data e Hora (df_confra é por pedido)
     df_confra_mapa = df_confra[['data_pedido']].rename(columns={'data_pedido': 'datahora'}).copy()
-    
-    # 2. Camisas: Data e Hora (df_camisas_expanded é por item, usamos o não expandido ou drop_duplicates)
-    df_camisas_mapa = df_camisas_expanded[['data_pedido']].rename(columns={'data_pedido': 'datahora'}).copy()
-    df_camisas_mapa = df_camisas_mapa.drop_duplicates() # 1 linha por pedido, não por item
-
-    # 3. Festa: Data e Hora
+    df_camisas_mapa = df_camisas_expanded[['data_pedido']].rename(columns={'data_pedido': 'datahora'}).copy().drop_duplicates() 
     df_festa_mapa = df_festa[['datahora']].copy()
     
-    df_eventos_consolidados = pd.concat([df_confra_mapa, df_camisas_mapa, df_festa_mapa], ignore_index=True)
-    df_eventos_consolidados = df_eventos_consolidados.dropna(subset=['datahora'])
+    df_eventos_consolidados = pd.concat([df_confra_mapa, df_camisas_mapa, df_festa_mapa], ignore_index=True).dropna(subset=['datahora'])
     
     if df_eventos_consolidados.empty:
         st.warning("Dados de evento insuficientes para o Mapa de Calor Consolidado.")
     else:
         df_eventos_consolidados['dia_semana_pt'] = df_eventos_consolidados['datahora'].dt.day_name().map({
-            'Monday': 'Segunda', 'Tuesday': 'Terça', 'Wednesday': 'Quarta', 
-            'Thursday': 'Quinta', 'Friday': 'Sexta', 'Saturday': 'Sábado', 'Sunday': 'Domingo'
-        })
+            'Monday': 'Segunda', 'Tuesday': 'Terça', 'Wednesday': 'Quarta', 'Thursday': 'Quinta', 'Friday': 'Sexta', 'Saturday': 'Sábado', 'Sunday': 'Domingo'})
         df_eventos_consolidados['hora'] = df_eventos_consolidados['datahora'].dt.hour
         ordem_dias_pt = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
 
@@ -454,109 +519,84 @@ def gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultado
             category_orders={'y': ordem_dias_pt},
             title="Períodos de Pico de Compra (Todos os Eventos)",
             labels={"hora": "Hora do Dia", "dia_semana_pt": "Dia da Semana", "z": "Nº de Pedidos"},
-            color_continuous_scale="Viridis"
+            color_continuous_scale="Reds" 
         )
         st.plotly_chart(fig_heatmap_consolidado, use_container_width=True)
     
     st.markdown("---")
     
-    # =====================================================================
-    # === VISUALIZAÇÕES DE MACHINE LEARNING ===
-    # =====================================================================
-
     # -------------------------------------------------------------------------
-    # 4. ML VISUALIZAÇÃO: SEGMENTAÇÃO DE CLIENTES (Clustering Scatter Plot)
+    # 5. ML VISUALIZAÇÃO: SEGMENTAÇÃO DE CLIENTES (Clustering Heatmap)
     # -------------------------------------------------------------------------
-    # 🎯 ALTERAÇÃO: Sugestão de Heatmap no K-Means
-    st.markdown("### 📊 Segmentação de Clientes (K-Means)")
-    st.markdown("**(Sugestão atendida):** Mantive o gráfico de dispersão, que é a visualização mais adequada para a clusterização de clientes, mostrando a segmentação com base nos seus gastos e compras.")
+    st.markdown("### 📊 Segmentação de Clientes (K-Means - Análise de Perfil)")
     
-    try:
-        # 1. Feature Engineering (Unindo dados por email padronizado)
-        # --- CONFRA FEATURES ---
-        df_clientes = df_confra.groupby('email_comprador_padrao').agg(
-            valor_pix_total=('valor_pix', 'sum'),
-            qtd_copo_total=('qtd_copo', 'sum'),
-            num_compras_confra=('email_comprador_padrao', 'size')
-        ).reset_index().rename(columns={'email_comprador_padrao': 'email'})
-
-        # --- CAMISAS FEATURES ---
-        df_camisas_agg = df_camisas_expanded.groupby('email_comprador_padrao').agg(
-            comprou_camisa=('email_comprador_padrao', 'size'),
-            qtd_camisas=('preco_individual', 'size'),
-            valor_camisas_total=('preco_individual', 'sum') 
-        ).reset_index().rename(columns={'email_comprador_padrao': 'email'})
-
-        # --- FESTA FEATURES (NOVO) ---
-        df_festa_agg = df_festa_expanded.groupby('email_comprador_padrao').agg(
-            qtd_ingressos_festa=('quantidade', 'sum'), 
-            valor_festa_total=('preco_unitario', 'sum'),
-            num_compras_festa=('email_comprador_padrao', 'size') # Usando size no expanded (1 linha por ingresso)
-        ).reset_index().rename(columns={'email_comprador_padrao': 'email'})
+    if 'cluster' in df_clientes_clustered.columns:
         
-        # Merge all
-        df_clientes = pd.merge(df_clientes, df_camisas_agg, on='email', how='outer').fillna(0)
-        df_clientes = pd.merge(df_clientes, df_festa_agg, on='email', how='outer').fillna(0)
+        # 3. Visualização (Heatmap de Média por Cluster)
+        features_to_show_for_mean = features 
+        df_cluster_analysis = df_clientes_clustered.groupby('cluster')[features_to_show_for_mean].mean().reset_index()
         
-        # 2. Escalonamento e K-Means
-        features = [
-            'valor_pix_total', 'qtd_copo_total', 'num_compras_confra', 
-            'comprou_camisa', 'qtd_camisas', 'valor_camisas_total',
-            'qtd_ingressos_festa', 'valor_festa_total'
-        ]
+        feature_mapping = {
+            'gasto_total': 'GASTO TOTAL (R$)', 'qtd_ingressos': 'Qtd. Total Ingressos', 
+            'qtd_copo_total': 'Qtd. Total Copos', 'qtd_camisas': 'Qtd. Total Camisas',
+            'num_compras_confra': 'Pedidos Confra', 'num_compras_camisas': 'Pedidos Camisas',
+            'num_compras_festa': 'Pedidos Festa'
+        }
         
-        features = [f for f in features if f in df_clientes.columns]
+        df_cluster_analysis.columns = ['cluster'] + [feature_mapping.get(col, col) for col in features_to_show_for_mean]
         
-        X_cluster = df_clientes[features].astype(float) 
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X_cluster)
-
-        K = 3
-        kmeans = KMeans(n_clusters=K, random_state=42, n_init=10)
-        df_clientes['cluster'] = kmeans.fit_predict(X_scaled)
-        df_clientes['cluster'] = df_clientes['cluster'].astype(str)
-
-        # 3. Visualização (Usando Gasto Total Geral)
-        df_clientes['gasto_total_geral'] = df_clientes['valor_pix_total'] + df_clientes['valor_camisas_total'] + df_clientes['valor_festa_total']
-
-        fig_cluster = px.scatter(
-            df_clientes,
-            x='gasto_total_geral',
-            y='qtd_copo_total',
-            color='cluster',
-            size='qtd_camisas', 
-            hover_data=['email', 'num_compras_confra', 'qtd_ingressos_festa'],
-            title=f'Clusters de Clientes (K={K}): Gasto Total Geral vs. Compra de Copos',
-            labels={'gasto_total_geral': 'Gasto Total Geral (R$)', 'qtd_copo_total': 'Total de Copos Comprados'}
+        # Indexar pelo cluster para uso na função interpret_clusters
+        df_cluster_analysis_indexed = df_cluster_analysis.set_index('cluster')
+        df_heatmap = df_cluster_analysis_indexed.T 
+        
+        fig_cluster_heatmap = go.Figure(data=go.Heatmap(
+            z=df_heatmap.values,
+            x=df_heatmap.columns, 
+            y=df_heatmap.index,
+            colorscale='YlOrRd',
+            hovertemplate='Cluster: %{x}<br>Característica: %{y}<br>Média: %{z:.2f}<extra></extra>'
+        ))
+        
+        fig_cluster_heatmap.update_layout(
+            title=f"Média das Características por Cluster (K={K})",
+            xaxis_title="Cluster",
+            yaxis_title="Característica",
+            height=400,
+            xaxis=dict(tickmode='array', tickvals=list(range(len(df_heatmap.columns))), ticktext=df_heatmap.columns) 
         )
-        st.plotly_chart(fig_cluster, use_container_width=True)
-    except Exception as e:
-        st.error(f"❌ Erro no Clustering (K-Means): {e}. Verifique as colunas de dados numéricos consolidados.")
+        annotations = []
+        for i, cluster_name in enumerate(df_heatmap.columns):
+            for j, feature_name in enumerate(df_heatmap.index):
+                mean_value = df_heatmap.iloc[j, i]
+                annotations.append(dict(
+                    x=cluster_name, y=feature_name, text=f'{mean_value:.2f}',
+                    showarrow=False, font=dict(color="black" if mean_value < df_heatmap.values.mean() else "white")
+                ))
+        fig_cluster_heatmap.update_layout(annotations=annotations)
 
-    # -------------------------------------------------------------------------
-    # 5. ML VISUALIZAÇÃO: OTIMIZAÇÃO DE LOTES (Regressão Plot)
-    # -------------------------------------------------------------------------
-    # 🎯 ALTERAÇÃO: REMOVIDA A SEÇÃO DE OTIMIZAÇÃO DE LOTES
-    # -------------------------------------------------------------------------
 
-    # -------------------------------------------------------------------------
-    # 6. ML VISUALIZAÇÃO: ANÁLISE DE CESTA DE COMPRAS (Regras de Associação)
-    # -------------------------------------------------------------------------
-    # 🎯 ALTERAÇÃO: REMOVIDA A SEÇÃO DE ANÁLISE DE CESTA DE COMPRAS
-    # -------------------------------------------------------------------------
-
+        st.plotly_chart(fig_cluster_heatmap, use_container_width=True)
+            
+    else:
+        st.warning("Não foi possível gerar a segmentação. Verifique se há clientes com transações registradas.")
+        
 # =========================================================================
 # === BLOCO PRINCIPAL DE EXECUÇÃO (Fluxo) =================================
 # =========================================================================
 
 # 1. Busca os dados de todas as tabelas
-# 🎯 ALTERAÇÃO: Removido o código de escrita no st.sidebar
 df_confra_bruto = buscar_dados_supabase('compra_confra')
 df_camisas_bruto = buscar_dados_supabase('compra_camisas')
 df_festa_bruto = buscar_dados_supabase('compra_ingressos')
 
 
 # 2. Processa os dados
+df_festa = pd.DataFrame() 
+df_festa_expanded = pd.DataFrame()
+resultados_festa_kpis = None
+df_ingressos_expanded = pd.DataFrame()
+df_copos_expanded = pd.DataFrame()
+
 try:
     # Confra
     (total_ingressos_pagantes, total_criancas_gratis, total_copos, 
@@ -565,24 +605,19 @@ try:
     # Camisas
     df_camisas_expanded = processar_dados_camisas(df_camisas_bruto)
     
-    # Festa 8 Anos - CORRIGIDO PARA RETORNAR DF PADRONIZADO E EXPANDIDO
+    # Festa 8 Anos 
     resultados_festa_kpis = processar_dados_festa_8anos(df_festa_bruto)
     
     # Desempacota os resultados para ter o DF padronizado
     if resultados_festa_kpis is not None:
         total_vendido, total_arrecadado, percentual_ocupacao, velocidade_media, df_festa, df_festa_expanded = resultados_festa_kpis
-    else:
-        df_festa = pd.DataFrame() 
-        df_festa_expanded = pd.DataFrame()
-        resultados_festa_kpis = None
-
+    
 except Exception as e:
     st.error(f"❌ ERRO FATAL no Processamento de Dados: {e}")
     st.stop()
 
 
 # --- TÍTULO GERAL ---
-# 🎯 ALTERAÇÃO: Título sem a menção 'Machine Learning'
 st.title("💰 Painel de Vendas - Chapiuski")
 st.markdown("Acompanhamento das vendas da **Confra**, **Camisas** e **Festa 8 Anos**.")
 st.divider()
@@ -591,9 +626,10 @@ st.divider()
 # =========================================================================
 # 🛑 CHAMADA DA SEÇÃO DE ANÁLISES AVANÇADAS E CONSOLIDAÇÃO 🛑
 # =========================================================================
-
-# Esta chamada executa e exibe todas as visualizações de ML no topo, agora consolidadas.
-gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultados_festa_kpis)
+# Executa e exibe todas as visualizações de ML no topo.
+if not (df_confra.empty and df_camisas_expanded is None and df_festa.empty):
+    # Passamos os DataFrames para a função, que cuida da consolidação e clustering
+    gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultados_festa_kpis)
 
 st.divider()
 
@@ -633,39 +669,36 @@ else:
     )
     st.plotly_chart(fig_confra_acumulada, use_container_width=True)
 
-    col_g_confra1, col_g_confra2 = st.columns(2)
+    # 🎯 CORREÇÃO: Resumo Quantitativo em 4 Barras
     
-    with col_g_confra1:
-        # 2. Distribuição de Ingressos (PAGANTES VS. GRATUITOS)
-        df_pagantes = pd.DataFrame({
-            'Tipo': ['Pagantes', 'Gratuitos (Crianças)'],
-            'Quantidade': [total_ingressos_pagantes, total_criancas_gratis]
-        })
-        
-        fig_distrib_ingr = px.pie(
-            df_pagantes,
-            values='Quantidade',
-            names='Tipo',
-            title="🍰 Distribuição de Ingressos (Pagantes vs. Gratuitos)",
-            color_discrete_map={'Pagantes': 'royalblue', 'Gratuitos (Crianças)': 'lightgray'}
-        )
-        st.plotly_chart(fig_distrib_ingr, use_container_width=True)
+    # 1. Quantidades base
+    total_ingressos = total_ingressos_pagantes + total_criancas_gratis
+    total_kits_transactions = len(df_confra[(df_confra['qtd_confra'] > 0) & (df_confra['qtd_copo'] > 0)])
+    
+    df_bar_data = pd.DataFrame({
+        'Métrica': ['Qtd. Copos', 'Qtd. Ingressos', 'Qtd. Kits (Pedidos)', 'Qtd. Crianças'],
+        'Quantidade': [total_copos, total_ingressos, total_kits_transactions, total_criancas_gratis],
+        'Cor': ['Copos', 'Ingressos', 'Kits', 'Crianças'] # Para cores consistentes
+    })
+    
+    # Simple bar chart for the four metrics
+    fig_confra_bar = px.bar(
+        df_bar_data,
+        x='Métrica',
+        y='Quantidade',
+        color='Cor',
+        title='Resumo Quantitativo de Itens da Confra',
+        labels={'Métrica': 'Métrica', 'Quantidade': 'Quantidade Total'},
+        color_discrete_map={'Copos': '#1f77b4', 'Ingressos': '#55A868', 'Kits': '#C44E52', 'Crianças': '#ff9900'},
+        text='Quantidade'
+    )
+    fig_confra_bar.update_traces(textposition='outside')
+    fig_confra_bar.update_layout(xaxis={'categoryorder':'array', 'categoryarray': ['Qtd. Copos', 'Qtd. Ingressos', 'Qtd. Kits (Pedidos)', 'Qtd. Crianças']})
 
-    with col_g_confra2:
-        # 3. Distribuição de QTD de Itens por Pedido
-        df_qtd = df_confra.groupby(['qtd_confra', 'qtd_copo']).size().reset_index(name='count')
-        df_qtd['Combinação'] = df_qtd.apply(lambda row: f"{row['qtd_confra']} Ingr. + {row['qtd_copo']} Copos", axis=1)
+    st.plotly_chart(fig_confra_bar, use_container_width=True)
 
-        fig_comb = px.bar(
-            df_qtd,
-            x='Combinação',
-            y='count',
-            title="📊 Combinações de Itens Mais Compradas",
-            labels={'Combinação': 'Combinação Qtd. Ingresso + Qtd. Copo', 'count': 'Total de Pedidos'}
-        )
-        st.plotly_chart(fig_comb, use_container_width=True)
-
-
+    # ---------------------------------------------------------------------------------
+    
     # --- TABELAS DETALHADAS (LOGÍSTICA) ---
     st.markdown("---")
     st.subheader("Listas Detalhadas para o Evento")
