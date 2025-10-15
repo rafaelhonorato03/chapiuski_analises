@@ -198,9 +198,9 @@ except Exception:
 st.divider()
 
 st.info(f"""
-    **📅 Data:** 06/12/2025 | **⏰ Horário:** 16h às 22h  
-    **📍 Local:** Penha Society  
-    **⚠️ Vendas:** De 15/10/2025 até 20/11/2025.
+    **📅 Data:** 06/12/2025 | **⏰ Horário:** 16h às 22h  
+    **📍 Local:** Penha Society  
+    **⚠️ Vendas:** De 15/10/2025 até 20/11/2025.
 """)
 
 st.markdown("""
@@ -357,7 +357,7 @@ if qtd_criancas > 0:
             with col_nome:
                 nome = st.text_input(f"Nome Completo (Criança {i+1})", key=f"nome_crianca_{i}")
             with col_doc:
-                documento = st.text_input(f"Documento (RG/Certidão) (Criança {i+1})", key=f"doc_crianca_{i}")
+                documento = st.text_input(f"RG ou Doc. com foto (Criança {i+1})", key=f"doc_crianca_{i}")
 
             nomes_criancas.append(nome)
             documentos_criancas.append(documento)
