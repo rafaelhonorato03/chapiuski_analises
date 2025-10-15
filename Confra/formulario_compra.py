@@ -339,7 +339,7 @@ with col_qtd_crianca:
     qtd_criancas = st.number_input(
         "Quantas crianças de até 12 anos acompanham?",
         min_value=0,
-        max_value=5, # Limitando a 5, mas você pode remover se quiser um limite maior
+        max_value=3, # Limitando a 3, mas você pode remover se quiser um limite maior
         value=0,
         step=1,
         key="qtd_criancas_extras"

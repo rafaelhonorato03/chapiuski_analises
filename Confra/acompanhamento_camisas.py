@@ -12,9 +12,9 @@ from sklearn.preprocessing import StandardScaler
 from datetime import timedelta
 
 # --- CONFIGURAÇÃO DA PÁGINA (Padrão/Centered) ---
-# O layout="centered" será mantido, mas o painel lateral é removido ao não usarmos st.sidebar
+# ALTERAÇÃO: Layout 'wide' para melhor visualização sem sidebar
 st.set_page_config(
-    layout="wide", # Alterado para 'wide' para melhor visualização do conteúdo sem sidebar
+    layout="wide", 
     page_title="Painel de Vendas - Chapiuski (Avançado)"
 )
 
@@ -36,7 +36,6 @@ except Exception as e:
 # === FUNÇÕES DE BUSCA E UTILITY ==========================================
 # =========================================================================
 
-# Ajustado para não ter escrita no sidebar
 @st.cache_data(ttl=60) 
 def buscar_dados_supabase(tabela):
     """Busca dados de uma tabela específica no Supabase, ajustando a ordenação."""
@@ -117,7 +116,7 @@ def expandir_dados_confra(df):
     
     # --- 1. EXPANSÃO DE INGRESSOS (LISTA DE PARTICIPANTES) ---
     colunas_base_ingresso = [
-        'data_pedido', 'nome_comprador', 'email_comprador_padrao', 'nomes_participantes', 
+        'data_pedido', 'nome_comprador', 'email_comprador_padrao', 'nomes_participantes', # nomes_participantes é o campo
         'documentos_participantes', 'e_crianca', 'qtd_confra', 'id'
     ]
     cols_existentes_ingresso = [col for col in colunas_base_ingresso if col in df.columns]
@@ -303,10 +302,24 @@ def gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultado
     st.markdown("#### Crescimento de Compradores Ativos (Únicos)")
 
     # PREPARAÇÃO DOS DADOS DE COMPRA (PADRÃO)
+    # df_confra: usa 'nome_comprador'
     df_confra_emails = df_confra[['email_comprador_padrao', 'data_pedido', 'nome_comprador']].rename(columns={'email_comprador_padrao': 'email', 'data_pedido': 'datahora', 'nome_comprador': 'nome'}).copy()
-    df_camisas_emails = df_camisas_expanded[['email_comprador_padrao', 'data_pedido', 'nome_comprador']].rename(columns={'email_comprador_padrao': 'email', 'data_pedido': 'datahora', 'nome_comprador': 'nome'}).copy().drop_duplicates(subset=['email', 'datahora'])
-    df_festa_emails = df_festa[['email_comprador_padrao', 'datahora', 'nome']].rename(columns={'email_comprador_padrao': 'email'}).copy()
     
+    # df_camisas_expanded: usa 'nome_comprador'
+    # Drop duplicates para contar o pedido, não cada item da camisa
+    df_camisas_emails = df_camisas_expanded[['email_comprador_padrao', 'data_pedido', 'nome_comprador']].rename(columns={'email_comprador_padrao': 'email', 'data_pedido': 'datahora', 'nome_comprador': 'nome'}).copy().drop_duplicates(subset=['email', 'datahora'])
+    
+    # df_festa: usa 'nomes' (que deve ser o nome do comprador principal/primeiro participante)
+    if 'nomes' in df_festa.columns:
+        df_festa_emails = df_festa[['email_comprador_padrao', 'datahora', 'nomes']].rename(columns={'email_comprador_padrao': 'email', 'nomes': 'nome'}).copy()
+        # Pega apenas o primeiro nome se houver vários (para ter o nome do comprador)
+        df_festa_emails['nome'] = df_festa_emails['nome'].apply(lambda x: str(x).split(',')[0].strip())
+    else:
+        # Fallback usando o nome do primeiro participante do expanded (se a coluna 'nomes' não vier)
+        df_festa_emails = df_festa_expanded[['email_comprador_padrao', 'datahora', 'nome_participante']].rename(columns={'email_comprador_padrao': 'email', 'nome_participante': 'nome'}).copy()
+        df_festa_emails = df_festa_emails.groupby(['email', 'datahora'])['nome'].first().reset_index()
+
+
     # Consolida os DataFrames
     df_compradores = pd.concat([df_confra_emails, df_camisas_emails, df_festa_emails], ignore_index=True)
     df_compradores = df_compradores.dropna(subset=['datahora', 'email']).drop_duplicates(subset=['email', 'datahora'])
@@ -323,10 +336,11 @@ def gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultado
     
     st.metric("👥 Total de Compradores Únicos (Base Ativa)", f"{participantes_ativos_totais}")
     
-    # 🎯 ALTERAÇÃO: Gráfico de Crescimento Acumulado
+    # 🎯 ALTERAÇÃO: Gráfico de Crescimento Acumulado (Email e Nome)
     col_cresc1, col_cresc2 = st.columns(2)
 
     with col_cresc1:
+        # Gráfico por Email (mais preciso para unicidade)
         fig_email = px.area(
             compras_cumulativas,
             x='data_dia',
@@ -337,9 +351,7 @@ def gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultado
         st.plotly_chart(fig_email, use_container_width=True)
 
     with col_cresc2:
-        # Replicando a mesma métrica, pois "crescimento por nome" ou "crescimento por email"
-        # é a mesma métrica de negócio (cliente único), mas o pedido foi para duas visualizações.
-        # Caso o nome completo seja usado como campo único (o que não é comum, mas atende ao pedido)
+        # Gráfico por Nome Único (Para atender a solicitação, mas pode haver duplicidade em nomes comuns)
         df_compradores['is_new_nome'] = ~df_compradores['nome'].duplicated()
         compras_por_dia_nome = df_compradores.groupby('data_dia')['is_new_nome'].sum().rename('novos_participantes_nome')
         compras_cumulativas_nome = compras_por_dia_nome.cumsum().rename('participantes_acumulados_nome').reset_index()
@@ -377,7 +389,7 @@ def gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultado
     
     df_top_compradores['gasto_total'] = df_top_compradores['gasto_confra'] + df_top_compradores['gasto_camisa'] + df_top_compradores['gasto_festa']
     
-    # Adicionar Nome do Comprador (pegando o nome da última compra, por exemplo)
+    # Adicionar Nome do Comprador (usando a última ocorrência do nome limpo em df_compradores)
     df_nomes = df_compradores[['email', 'nome']].drop_duplicates(subset=['email'], keep='last')
     df_top_compradores = pd.merge(df_top_compradores, df_nomes, on='email', how='left')
     
@@ -408,10 +420,10 @@ def gerar_analises_avancadas(df_confra, df_camisas_expanded, df_festa, resultado
     
     # Consolidação dos DataFrames para o Heatmap de TODOS os eventos
     
-    # 1. Confra: Data e Hora
+    # 1. Confra: Data e Hora (df_confra é por pedido)
     df_confra_mapa = df_confra[['data_pedido']].rename(columns={'data_pedido': 'datahora'}).copy()
     
-    # 2. Camisas: Data e Hora
+    # 2. Camisas: Data e Hora (df_camisas_expanded é por item, usamos o não expandido ou drop_duplicates)
     df_camisas_mapa = df_camisas_expanded[['data_pedido']].rename(columns={'data_pedido': 'datahora'}).copy()
     df_camisas_mapa = df_camisas_mapa.drop_duplicates() # 1 linha por pedido, não por item
 
@@ -570,8 +582,7 @@ except Exception as e:
 
 
 # --- TÍTULO GERAL ---
-# 🎯 ALTERAÇÃO: Remoção da menção a 'Painel de Vendas - Chapiuski (Avançado)' 
-# no título principal, mantendo apenas 'Painel de Vendas - Chapiuski'
+# 🎯 ALTERAÇÃO: Título sem a menção 'Machine Learning'
 st.title("💰 Painel de Vendas - Chapiuski")
 st.markdown("Acompanhamento das vendas da **Confra**, **Camisas** e **Festa 8 Anos**.")
 st.divider()
@@ -709,12 +720,6 @@ else:
         df_confra_display['Valor Pago (R$)'] = df_confra_display['Valor Pago (R$)'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'x').replace('.', ',').replace('x', '.'))
 
         st.dataframe(df_confra_display, use_container_width=True)
-    
-    # 🎯 ALTERAÇÃO: O Heatmap específico da Confra foi movido para o bloco de análise avançada (item 3)
-    # e agora é um heatmap consolidado de TODOS os eventos.
-    # O bloco original foi removido, mas para referência, o heatmap específico da confra seria:
-    # st.markdown("#### Mapa de Calor: Vendas Confra (Dia vs. Hora)")
-    # (Código original removido para atender a sua solicitação)
 
 
 st.divider()
@@ -936,8 +941,8 @@ else:
             'preco_unitario': 'Preço (R$)'
         })
     
-        df_display.insert(2, 'Comprador Resp.', df_display['Email Compra'])
-        df_display = df_display.drop(columns=['Email Compra'])
+        # A coluna 'Comprador Resp.' será o nome do participante (que é o comprador para o primeiro ingresso)
+        df_display.insert(2, 'Comprador Resp.', df_display['Participante']) 
         
         df_display['Data/Hora Compra'] = df_display['Data/Hora Compra'].dt.strftime('%d/%m/%Y %H:%M')
         df_display['Preço (R$)'] = df_display['Preço (R$)'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'x').replace('.', ',').replace('x', '.'))
