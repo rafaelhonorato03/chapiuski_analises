@@ -1,108 +1,74 @@
 import os
 from dotenv import load_dotenv
-from supabase import create_client, Client
-import pandas as pd
+from supabase import create_client
 import streamlit as st
-import plotly.express as px
+from datetime import datetime
 
-# 🔑 Carregar variáveis de ambiente
+# ==============================
+# 🔧 CONFIG
+# ==============================
 load_dotenv()
+st.set_page_config(page_title="Votação", page_icon="🏆", layout="centered")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("❌ Erro: Variáveis de ambiente do Supabase não carregadas.")
+    st.stop()
 
-st.set_page_config(page_title="Acompanhamento de Ingressos")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-st.title("🎟️ Acompanhamento de Ingressos - Festa Chapiuski 8 anos")
+VOTACAO_TABLE = "compra_ingressos"
 
-# 📦 Carregar dados
-data = supabase.table('compra_ingressos').select('*').execute()
+# ==============================
+# LISTA PARA VOTAR
+# ==============================
+OPCOES = [
+    "Isaías (Bandido)", "Hassan", "Kevin", "JP", "Renato", "Kauan", 
+    "Marrone", "Dody", "Kenneth", "Marquezini", "Joel", "Xandinho",
+    "Biel", "Tutão", "Dembele", "Rafa Crispim", "Renan Silva", "Renan",
+    "Daniel Rodrigues", "Rafa Castilho"
+]
 
-if data.data:
-    df = pd.DataFrame(data.data)
+# ==============================
+# FUNÇÃO PARA SALVAR VOTOS
+# ==============================
+def salvar_voto(nome, votos):
+    data = datetime.now().isoformat()
 
-    # 🧹 Tratamento dos dados
-    df['datahora'] = pd.to_datetime(df['datahora'])
-    df['email'] = df['email'].str.lower()
+    payload = [
+        {"nome_eleitor": nome, "craque_escolhido": v, "datahora": data}
+        for v in votos
+    ]
 
-    df_expanded = df.loc[df.index.repeat(df['quantidade'])].reset_index(drop=True)
-    df_expanded['quantidade'] = 1
+    supabase.table(VOTACAO_TABLE).insert(payload).execute()
 
-    def split_value(val, idx):
-        parts = str(val).split(',')
-        return parts[idx].strip() if idx < len(parts) else parts[-1].strip()
 
-    df_expanded['seq'] = df_expanded.groupby('id').cumcount()
-    df_expanded['nomes'] = df_expanded.apply(lambda x: split_value(x['nomes'], x['seq']), axis=1)
-    df_expanded['documentos'] = df_expanded.apply(lambda x: split_value(x['documentos'], x['seq']), axis=1)
+# ==============================
+# UI
+# ==============================
+st.title("🏆 Votação Chapiuski - Escolha 3 Craques da Galera")
 
-    precos = {'1º LOTE PROMOCIONAL': 100, '2º LOTE': 120}
-    df_expanded['preco'] = df_expanded['lote'].map(precos)
+with st.form("form"):
+    nome = st.text_input("Seu nome:")
 
-    # 📊 KPIs
-    total_vendido = df_expanded.shape[0]
-    total_disponivel = 100
-    percentual_ocupacao = total_vendido / total_disponivel * 100 if total_disponivel else 0
-    total_arrecadado = df_expanded['preco'].sum()
-
-    # 📅 Venda por dia
-    venda_por_dia = df_expanded.groupby(df_expanded['datahora'].dt.date).size().reset_index(name='quantidade')
-    venda_por_dia['datahora'] = pd.to_datetime(venda_por_dia['datahora'])
-    venda_por_dia['acumulada'] = venda_por_dia['quantidade'].cumsum()
-
-    velocidade_media = venda_por_dia['quantidade'].mean()
-
-    # 🔥 Heatmaps
-    df_expanded['hora'] = df_expanded['datahora'].dt.hour
-    df_expanded['dia_semana'] = df_expanded['datahora'].dt.day_name()
-
-    dias_ordem = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    df_expanded['dia_semana'] = pd.Categorical(df_expanded['dia_semana'], categories=dias_ordem, ordered=True)
-
-    mapa_calor = df_expanded.groupby(['dia_semana', 'hora']).size().reset_index(name='quantidade')
-
-    # 🔝 KPIs no topo
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("🎟️ Total Vendido", total_vendido)
-    col2.metric("📦 Percentual Vendido", f"{percentual_ocupacao:.2f}%")
-    col3.metric("💰 Total Arrecadado (R$)", f"R$ {total_arrecadado}")
-    col4.metric("🚀 Venda Média por Dia", round(velocidade_media, 2))
-
-    # 📅 Venda por dia (real)
-    fig_diaria_real = px.bar(venda_por_dia, x='datahora', y='quantidade',
-                             title="📅 Vendas por Dia",
-                             labels={'datahora': 'Data', 'quantidade': 'Quantidade'})
-    st.plotly_chart(fig_diaria_real, use_container_width=True)
-
-    # 📈 Venda acumulada real
-    fig_acumulada = px.line(
-        venda_por_dia,
-        x='datahora',
-        y='acumulada',
-        title="📈 Venda Acumulada Real",
-        labels={'datahora': 'Data', 'acumulada': 'Ingressos Acumulados'}
+    votos = st.multiselect(
+        "Escolha exatamente 3 jogadores:", 
+        OPCOES,
+        max_selections=3
     )
-    st.plotly_chart(fig_acumulada, use_container_width=True)
 
-    # 🔥 Heatmap Hora x Dia da Semana
-    fig_heatmap = px.density_heatmap(
-        mapa_calor,
-        x="hora",
-        y="dia_semana",
-        z="quantidade",
-        histfunc="sum",
-        nbinsx=24,
-        title="🔥 Mapa de Calor - Vendas por Hora e Dia da Semana",
-        labels={"hora": "Hora do Dia", "dia_semana": "Dia da Semana", "quantidade": "Vendas"},
-        color_continuous_scale="Reds"
-    )
-    st.plotly_chart(fig_heatmap, use_container_width=True)
+    enviado = st.form_submit_button("CONFIRMAR VOTO")
 
-    # 📄 Dados brutos
-    with st.expander("📄 Ver Dados"):
-        st.dataframe(df_expanded)
-
-else:
-    st.warning("Nenhum dado encontrado na tabela.")
+# ==============================
+# LÓGICA DE ENVIO
+# ==============================
+if enviado:
+    if not nome.strip():
+        st.error("⚠️ Preencha seu nome.")
+    elif len(votos) != 3:
+        st.error("⚠️ Você deve escolher **exatamente 3 jogadores**.")
+    else:
+        salvar_voto(nome.strip(), votos)
+        st.success("🎉 Voto registrado com sucesso!")
