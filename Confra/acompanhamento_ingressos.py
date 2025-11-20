@@ -27,7 +27,7 @@ VOTACAO_TABLE = "compra_ingressos"
 # ==============================
 # Inserção da imagem craque.jpg (assumindo que o arquivo está no mesmo diretório ou caminho acessível)
 try:
-    st.image(r"C:\Users\tabat\Documents\GitHub\chapiuski_analises\Confra\craque.jpg", use_column_width=True)
+    st.image("Confra\craque.jpg", use_column_width=True)
 except FileNotFoundError:
     st.warning("⚠️ Imagem 'craque.jpg' não encontrada. Verifique o caminho.")
 
