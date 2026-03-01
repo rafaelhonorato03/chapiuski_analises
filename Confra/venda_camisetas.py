@@ -115,7 +115,7 @@ dados_venda = {}
 
 if q_bone > 0:
     st.divider()
-    st.image(get_p("bone.jpeg"), width=200, caption="Modelo Boné")
+    st.image(get_p("BONE.jpeg"), width=200, caption="Modelo Boné")
 
 if q_comf > 0 or q_over > 0:
     st.divider()
