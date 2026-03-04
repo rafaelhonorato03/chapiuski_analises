@@ -118,20 +118,20 @@ if q_comf > 0 or q_over > 0:
     if q_comf > 0:
         st.write("**Artes para modelo Comfort:**")
         col_c1, col_c2 = st.columns(2)
-        with col_c1: exibir_imagem_segura("confort+degrade.jpeg", cap="comfort Arte Degradê")
-        with col_c2: exibir_imagem_segura("confort+logo.jpeg", cap="comfort Arte Logo")
+        with col_c1: exibir_imagem_segura("confort+degrade.jpeg")
+        with col_c2: exibir_imagem_segura("confort+logo.jpeg")
     
     if q_over > 0:
         st.write("**Artes para modelo Oversized:**")
         col_o1, col_o2 = st.columns(2)
-        with col_o1: exibir_imagem_segura("over+degrade.jpeg", cap="Oversized Degradê")
-        with col_o2: exibir_imagem_segura("over+logo.jpeg", cap="Oversized Logo")
+        with col_o1: exibir_imagem_segura("over+degrade.jpeg")
+        with col_o2: exibir_imagem_segura("over+logo.jpeg")
     
     st.divider()
     st.subheader("2. Tamanhos e Personalização")
     col_t1, col_t2 = st.columns(2)
-    with col_t1: exibir_imagem_segura("tam_comfort.jpeg", cap="Tabela Comfort")
-    with col_t2: exibir_imagem_segura("tam_over.jpeg", cap="Tabela Oversized")
+    with col_t1: exibir_imagem_segura("tam_comfort.jpeg")
+    with col_t2: exibir_imagem_segura("tam_over.jpeg")
 
     if q_comf > 0:
         for i in range(q_comf):
