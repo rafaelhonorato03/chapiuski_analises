@@ -31,7 +31,7 @@ EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
 EMAIL_SENHA = os.getenv("EMAIL_SENHA")
 EMAIL_DESTINATARIO = os.getenv("EMAIL_DESTINATARIO")
 
-# Links PagSeguro (Com Taxas)
+# Links PagSeguro (Corrigido item 1 Bone, 2 Comfort e 1 Oversized)
 LINKS_CARTAO = {
     (1, 0, 0): ("R$ 52,63", "https://pag.ae/81xQ1jT7L"),
     (0, 1, 0): ("R$ 84,21", "https://pag.ae/81xQ1Z5Vr"),
@@ -47,7 +47,7 @@ LINKS_CARTAO = {
     (0, 2, 2): ("R$ 336,81", "https://pag.ae/81xQ4QRsR"),
     (1, 1, 1): ("R$ 205,25", "https://pag.ae/81xQ576S5"),
     (1, 1, 2): ("R$ 289,45", "https://pag.ae/81xQ5uSev"),
-    (1, 2, 1): ("R$ 275,00", "https://pag.ae/81xQ5uSev"),
+    (1, 2, 1): ("R$ 289,45", "https://pag.ae/81xQ5uSev"), # Corrigido aqui de R$ 275 para R$ 289,45
     (1, 2, 2): ("R$ 373,65", "https://pag.ae/81xQ64KTL"),
     (2, 2, 2): ("R$ 410,49", "https://pag.ae/81xQ6rE65"),
     (2, 1, 1): ("R$ 257,87", "https://pag.ae/81xQ6KEjv"),
@@ -64,7 +64,7 @@ def enviar_emails(dados, arquivo):
     E-mail: {dados['email_comprador']}
     Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}
     
-    VALOR TOTAL: R$ {dados['valor_total']:.2f}
+    VALOR TOTAL PIX: R$ {dados['valor_total']:.2f}
     
     ITENS:
     - Bonés: {dados['qtd_bone_avulso']}
@@ -113,29 +113,38 @@ if q_bone > 0:
 if q_comf > 0 or q_over > 0:
     st.divider()
     st.subheader("🖼️ Opções de Arte")
-    col_art1, col_art2 = st.columns(2)
-    with col_art1:
-        exibir_imagem_segura("CPK A1.jpeg", cap="Arte 1")
-    with col_art2:
-        exibir_imagem_segura("CPK A2.jpeg", cap="Arte 2")
+    
+    # Lógica de exibição dinâmica de imagens baseada na seleção
+    if q_comf > 0:
+        st.write("**Artes para modelo Comfort:**")
+        col_c1, col_c2 = st.columns(2)
+        with col_c1: exibir_imagem_segura("confort+degrade.jpeg", cap="Confort Arte Degradê")
+        with col_c2: exibir_imagem_segura("confort+logo.jpeg", cap="Confort Arte Logo")
+    
+    if q_over > 0:
+        st.write("**Artes para modelo Oversized:**")
+        col_o1, col_o2 = st.columns(2)
+        with col_o1: exibir_imagem_segura("over+degrade.jpeg", cap="Oversized Degradê")
+        with col_o2: exibir_imagem_segura("over+logo.jpeg", cap="Oversized Logo")
     
     st.divider()
     st.subheader("2. Tamanhos e Personalização")
-    exibir_imagem_segura("Tam Confort.jpeg", cap="Tabela Comfort")
-    exibir_imagem_segura("Tam Oversized.jpeg", cap="Tabela Oversized")
+    col_t1, col_t2 = st.columns(2)
+    with col_t1: exibir_imagem_segura("tam_comfort.jpeg", cap="Tabela Comfort")
+    with col_t2: exibir_imagem_segura("tam_over.jpeg", cap="Tabela Oversized")
 
     if q_comf > 0:
         for i in range(q_comf):
             with st.expander(f"Configurar Comfort #{i+1}", expanded=True):
                 c1, c2 = st.columns(2)
-                dados_venda[f"comf_{i+1}_arte"] = c1.radio(f"Arte (C#{i+1})", ["Arte 1", "Arte 2"], key=f"ac{i}")
+                dados_venda[f"comf_{i+1}_arte"] = c1.radio(f"Arte (C#{i+1})", ["Confort Arte Degradê", "Confort Arte Logo"], key=f"ac{i}")
                 dados_venda[f"comf_{i+1}_tam"] = c2.selectbox(f"Tam (C#{i+1})", ["P", "M", "G", "GG", "XGG"], key=f"tc{i}")
 
     if q_over > 0:
         for i in range(q_over):
             with st.expander(f"Configurar Oversized #{i+1}", expanded=True):
                 c1, c2 = st.columns(2)
-                dados_venda[f"over_{i+1}_arte"] = c1.radio(f"Arte (O#{i+1})", ["Arte 1", "Arte 2"], key=f"ao{i}")
+                dados_venda[f"over_{i+1}_arte"] = c1.radio(f"Arte (O#{i+1})", ["Oversized Degradê", "Oversized Logo"], key=f"ao{i}")
                 dados_venda[f"over_{i+1}_tam"] = c2.selectbox(f"Tam (O#{i+1})", ["P", "M", "G", "GG", "XGG"], key=f"to{i}")
 
 # ==== Lógica de Preço Inteligente ====
