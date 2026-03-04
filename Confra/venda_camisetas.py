@@ -74,7 +74,7 @@ def enviar_emails(dados, arquivo_comprovante):
     
     ITENS:
     - Bonés: {dados['qtd_bone_avulso']}
-    - Camisetas Comfort: {dados.get('qtd_comfort', 0)}
+    - Camisetas Comfort: {dados.get('qtd_confort', 0)}
     - Camisetas Oversized: {dados.get('qtd_over', 0)}
     --------------------------------------
     Verifique os arquivos anexos para o comprovante e a planilha de dados.
@@ -197,7 +197,7 @@ if any(total_tupla):
                 try:
                     p = {
                         "nome_comprador": n, "email_comprador": e, "whatsapp_comprador": w,
-                        "qtd_bone_avulso": q_bone, "qtd_comfort": q_comfort, "qtd_over": q_over,
+                        "qtd_bone_avulso": q_bone, "qtd_confort": q_comfort, "qtd_over": q_over,
                         "valor_total": float(valor_final), "created_at": datetime.now().isoformat(),
                         **dados_venda
                     }
