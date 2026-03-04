@@ -56,53 +56,59 @@ LINKS_CARTAO = {
     (2, 2, 1): ("R$ 342,07", "https://pag.ae/81xQ7gX7R"),
 }
 
-def enviar_emails(dados, arquivo_comprovante):
-    df = pd.DataFrame([dados])
-    csv_buffer = io.StringIO()
-    df.to_csv(csv_buffer, index=False, sep=';', encoding='utf-8-sig')
-    
-    resumo = f"""
-    📦 DETALHES DO PEDIDO - CHAPIUSKI 2026
-    --------------------------------------
-    Comprador: {dados['nome_comprador']}
-    WhatsApp: {dados['whatsapp_comprador']}
-    E-mail: {dados['email_comprador']}
-    Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}
-    
-    VALOR TOTAL PIX: R$ {dados['valor_total']:.2f}
-    
-    ITENS:
-    - Bonés: {dados['qtd_bone_avulso']}
-    - Camisetas Comfort: {dados.get('qtd_confort', 0)}
-    - Camisetas Oversized: {dados.get('qtd_over', 0)}
-    --------------------------------------
-    Verifique os arquivos anexos para os detalhes.
-    """
-    
-    msg = MIMEMultipart()
-    msg['Subject'] = f"✅ NOVO PEDIDO: {dados['nome_comprador']}"
-    msg['From'] = EMAIL_REMETENTE
-    msg['To'] = EMAIL_DESTINATARIO
-    msg.attach(MIMEText(resumo, 'plain'))
+def enviar_emails(dados_atuais, arquivo_comprovante):
+    try:
+        # BUSCA O HISTÓRICO COMPLETO DO SUPABASE
+        resposta = supabase.table("compra_confra").select("*").execute()
+        historico = resposta.data
+        
+        # Converte para DataFrame para gerar o CSV
+        df_historico = pd.DataFrame(historico)
+        
+        # Gera o CSV em memória
+        csv_buffer = io.StringIO()
+        df_historico.to_csv(csv_buffer, index=False, sep=';', encoding='utf-8-sig')
+        
+        resumo = f"""
+        ✅ NOVO PEDIDO REGISTRADO - CHAPIUSKI 2026
+        ------------------------------------------
+        Comprador Atual: {dados_atuais['nome_comprador']}
+        Valor: R$ {dados_atuais['valor_total']:.2f}
+        
+        📎 O arquivo 'historico_vendas.csv' em anexo contém 
+        TODOS os pedidos realizados até o momento.
+        ------------------------------------------
+        """
+        
+        msg = MIMEMultipart()
+        msg['Subject'] = f"📈 NOVO PEDIDO + HISTÓRICO: {dados_atuais['nome_comprador']}"
+        msg['From'] = EMAIL_REMETENTE
+        msg['To'] = EMAIL_DESTINATARIO
+        msg.attach(MIMEText(resumo, 'plain'))
 
-    part_csv = MIMEBase('application', "octet-stream")
-    part_csv.set_payload(csv_buffer.getvalue().encode('utf-8-sig'))
-    encoders.encode_base64(part_csv)
-    part_csv.add_header('Content-Disposition', 'attachment; filename="dados_pedido.csv"')
-    msg.attach(part_csv)
+        # Anexo 1: Histórico Completo (CSV)
+        part_csv = MIMEBase('application', "octet-stream")
+        part_csv.set_payload(csv_buffer.getvalue().encode('utf-8-sig'))
+        encoders.encode_base64(part_csv)
+        part_csv.add_header('Content-Disposition', 'attachment; filename="historico_vendas.csv"')
+        msg.attach(part_csv)
 
-    if arquivo_comprovante:
-        part_img = MIMEBase('application', "octet-stream")
-        part_img.set_payload(arquivo_comprovante.getvalue())
-        encoders.encode_base64(part_img)
-        part_img.add_header('Content-Disposition', 'attachment; filename="comprovante.png"')
-        msg.attach(part_img)
+        # Anexo 2: Comprovante da compra atual
+        if arquivo_comprovante:
+            part_img = MIMEBase('application', "octet-stream")
+            part_img.set_payload(arquivo_comprovante.getvalue())
+            encoders.encode_base64(part_img)
+            part_img.add_header('Content-Disposition', 'attachment; filename="comprovante.png"')
+            msg.attach(part_img)
 
-    destinatarios = [d.strip() for d in EMAIL_DESTINATARIO.split(",")]
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-        server.login(EMAIL_REMETENTE, EMAIL_SENHA)
-        server.sendmail(EMAIL_REMETENTE, destinatarios, msg.as_string())
-        server.sendmail(EMAIL_REMETENTE, [dados['email_comprador']], msg.as_string())
+        destinatarios = [d.strip() for d in EMAIL_DESTINATARIO.split(",")]
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(EMAIL_REMETENTE, EMAIL_SENHA)
+            server.sendmail(EMAIL_REMETENTE, destinatarios, msg.as_string())
+            server.sendmail(EMAIL_REMETENTE, [dados_atuais['email_comprador']], msg.as_string())
+            
+    except Exception as e:
+        st.error(f"Erro ao gerar histórico/enviar e-mail: {e}")
 
 # ==== Interface ====
 exibir_imagem_segura("Central.jpeg")
@@ -145,7 +151,6 @@ if q_comfort > 0 or q_over > 0:
         for i in range(q_comfort):
             with st.expander(f"Configurar Comfort #{i+1}", expanded=True):
                 c1, c2 = st.columns(2)
-                # Note: Chave da coluna mantida como 'confort' para o Supabase
                 dados_venda[f"confort_{i+1}_arte"] = c1.radio(f"Arte (C#{i+1})", ["Comfort Arte Degradê", "Comfort Arte Logo"], key=f"ac{i}")
                 dados_venda[f"confort_{i+1}_tam"] = c2.selectbox(f"Tam (C#{i+1})", ["P", "M", "G", "GG", "XGG"], key=f"tc{i}")
 
@@ -188,13 +193,17 @@ if any(total_tupla):
                 try:
                     p = {
                         "nome_comprador": n, "email_comprador": e, "whatsapp_comprador": w,
-                        "qtd_bone_avulso": q_bone, "qtd_confort": q_comfort, "qtd_over": q_over, # Colunas ajustadas para confort
+                        "qtd_bone_avulso": q_bone, "qtd_confort": q_comfort, "qtd_over": q_over,
                         "valor_total": float(valor_final), "created_at": datetime.now().isoformat(),
                         **dados_venda
                     }
+                    # Primeiro insere no banco para garantir que a consulta posterior pegue a venda atual
                     supabase.table("compra_confra").insert(p).execute()
+                    
+                    # Agora envia o e-mail pegando o histórico atualizado do banco
                     enviar_emails(p, comp)
-                    st.success("Pedido registrado!")
+                    
+                    st.success("Pedido registrado e histórico enviado!")
                     st.balloons()
                 except Exception as ex: st.error(f"Erro: {ex}")
             else: st.warning("Preencha tudo!")
