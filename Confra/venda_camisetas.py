@@ -122,7 +122,7 @@ dados_venda = {}
 
 if q_bone > 0:
     st.divider()
-    exibir_imagem_segura("BONE.jpeg", cap="Modelo Boné")
+    exibir_imagem_segura("BONE.jpeg")
 
 if q_comfort > 0 or q_over > 0:
     st.divider()
