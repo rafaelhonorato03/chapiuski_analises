@@ -31,7 +31,7 @@ EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
 EMAIL_SENHA = os.getenv("EMAIL_SENHA")
 EMAIL_DESTINATARIO = os.getenv("EMAIL_DESTINATARIO")
 
-# Links PagSeguro (Mantenha seu dicionário atual aqui)
+# Links PagSeguro (Com Taxas)
 LINKS_CARTAO = {
     (1, 0, 0): ("R$ 52,63", "https://pag.ae/81xQ1jT7L"),
     (0, 1, 0): ("R$ 84,21", "https://pag.ae/81xQ1Z5Vr"),
@@ -85,15 +85,17 @@ def enviar_emails(dados, arquivo):
         part.add_header('Content-Disposition', 'attachment; filename="comprovante.png"')
         msg_admin.attach(part)
 
+    destinatarios = [d.strip() for d in EMAIL_DESTINATARIO.split(",")]
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(EMAIL_REMETENTE, EMAIL_SENHA)
-        server.sendmail(EMAIL_REMETENTE, EMAIL_DESTINATARIO.split(","), msg_admin.as_string())
+        server.sendmail(EMAIL_REMETENTE, destinatarios, msg_admin.as_string())
         server.sendmail(EMAIL_REMETENTE, [dados['email_comprador']], msg_admin.as_string())
 
 # ==== Interface ====
 exibir_imagem_segura("Central.jpeg")
 st.title("👕 Chapiuski 2026")
 
+# 1. Quantidades
 st.subheader("1. Escolha as quantidades")
 col_q1, col_q2, col_q3 = st.columns(3)
 with col_q1: q_bone = st.number_input("Bonés (R$ 50)", 0, 2, 0)
@@ -102,28 +104,39 @@ with col_q3: q_over = st.number_input("Oversized (R$ 80)", 0, 2, 0)
 
 dados_venda = {}
 
+# Exibição do Boné
 if q_bone > 0:
     st.divider()
-    exibir_imagem_segura("BONE.jpeg", cap="Modelo Boné", w=200)
+    exibir_imagem_segura("BONE.jpeg", cap="Modelo Boné", w=250)
 
+# Exibição das Artes das Camisetas
 if q_comf > 0 or q_over > 0:
     st.divider()
+    st.subheader("🖼️ Opções de Arte")
+    col_art1, col_art2 = st.columns(2)
+    with col_art1:
+        exibir_imagem_segura("CPK A1.jpeg", cap="Arte 1")
+    with col_art2:
+        exibir_imagem_segura("CPK A2.jpeg", cap="Arte 2")
+    
+    st.divider()
+    st.subheader("2. Tamanhos e Personalização")
     exibir_imagem_segura("Tam Confort.jpeg", cap="Tabela Comfort")
     exibir_imagem_segura("Tam Oversized.jpeg", cap="Tabela Oversized")
 
     if q_comf > 0:
         for i in range(q_comf):
-            with st.expander(f"Comfort #{i+1}", expanded=True):
+            with st.expander(f"Configurar Comfort #{i+1}", expanded=True):
                 c1, c2 = st.columns(2)
-                dados_venda[f"comf_{i+1}_arte"] = c1.radio(f"Arte", ["Arte 1", "Arte 2"], key=f"ac{i}")
-                dados_venda[f"comf_{i+1}_tam"] = c2.selectbox(f"Tam", ["P", "M", "G", "GG", "XGG"], key=f"tc{i}")
+                dados_venda[f"comf_{i+1}_arte"] = c1.radio(f"Arte (C#{i+1})", ["Arte 1", "Arte 2"], key=f"ac{i}")
+                dados_venda[f"comf_{i+1}_tam"] = c2.selectbox(f"Tam (C#{i+1})", ["P", "M", "G", "GG", "XGG"], key=f"tc{i}")
 
     if q_over > 0:
         for i in range(q_over):
-            with st.expander(f"Oversized #{i+1}", expanded=True):
+            with st.expander(f"Configurar Oversized #{i+1}", expanded=True):
                 c1, c2 = st.columns(2)
-                dados_venda[f"over_{i+1}_arte"] = c1.radio(f"Arte", ["Arte 1", "Arte 2"], key=f"ao{i}")
-                dados_venda[f"over_{i+1}_tam"] = c2.selectbox(f"Tam", ["P", "M", "G", "GG", "XGG"], key=f"to{i}")
+                dados_venda[f"over_{i+1}_arte"] = c1.radio(f"Arte (O#{i+1})", ["Arte 1", "Arte 2"], key=f"ao{i}")
+                dados_venda[f"over_{i+1}_tam"] = c2.selectbox(f"Tam (O#{i+1})", ["P", "M", "G", "GG", "XGG"], key=f"to{i}")
 
 # ==== Lógica de Preço Inteligente ====
 total_tupla = (q_bone, q_comf, q_over)
@@ -131,15 +144,11 @@ total_tupla = (q_bone, q_comf, q_over)
 if any(total_tupla):
     st.divider()
     
-    # Descobre quantos Kits completos de 195 existem na seleção
     num_kits = min(q_bone, q_comf, q_over)
-    
-    # Sobras (o que não entrou no kit)
     sobra_bone = q_bone - num_kits
     sobra_comf = q_comf - num_kits
     sobra_over = q_over - num_kits
     
-    # Cálculo Final
     valor_final = (num_kits * 195.0) + (sobra_bone * 50.0) + (sobra_comf * 80.0) + (sobra_over * 80.0)
     
     if num_kits > 0:
@@ -166,7 +175,7 @@ if any(total_tupla):
                     p = {
                         "nome_comprador": n, "email_comprador": e, "whatsapp_comprador": w,
                         "qtd_bone_avulso": q_bone, "qtd_camiseta_avulsa": q_comf + q_over,
-                        "valor_total": valor_final, "created_at": datetime.now().isoformat(),
+                        "valor_total": float(valor_final), "created_at": datetime.now().isoformat(),
                         "qtd_comf": q_comf, "qtd_over": q_over, **dados_venda
                     }
                     supabase.table("compra_confra").insert(p).execute()
