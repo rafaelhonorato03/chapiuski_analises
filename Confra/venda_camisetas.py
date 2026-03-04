@@ -47,7 +47,7 @@ LINKS_CARTAO = {
     (0, 2, 2): ("R$ 336,81", "https://pag.ae/81xQ4QRsR"),
     (1, 1, 1): ("R$ 205,25", "https://pag.ae/81xQ576S5"),
     (1, 1, 2): ("R$ 289,45", "https://pag.ae/81xQ5uSev"),
-    (1, 2, 1): ("R$ 289,45", "https://pag.ae/81xQ5uSev"), # Corrigido aqui de R$ 275 para R$ 289,45
+    (1, 2, 1): ("R$ 289,45", "https://pag.ae/81xQ5uSev"),
     (1, 2, 2): ("R$ 373,65", "https://pag.ae/81xQ64KTL"),
     (2, 2, 2): ("R$ 410,49", "https://pag.ae/81xQ6rE65"),
     (2, 1, 1): ("R$ 257,87", "https://pag.ae/81xQ6KEjv"),
@@ -118,8 +118,8 @@ if q_comf > 0 or q_over > 0:
     if q_comf > 0:
         st.write("**Artes para modelo Comfort:**")
         col_c1, col_c2 = st.columns(2)
-        with col_c1: exibir_imagem_segura("confort+degrade.jpeg", cap="Confort Arte Degradê")
-        with col_c2: exibir_imagem_segura("confort+logo.jpeg", cap="Confort Arte Logo")
+        with col_c1: exibir_imagem_segura("confort+degrade.jpeg", cap="comfort Arte Degradê")
+        with col_c2: exibir_imagem_segura("confort+logo.jpeg", cap="comfort Arte Logo")
     
     if q_over > 0:
         st.write("**Artes para modelo Oversized:**")
