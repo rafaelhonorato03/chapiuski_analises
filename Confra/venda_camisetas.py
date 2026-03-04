@@ -180,7 +180,10 @@ if any(total_tupla):
         st.link_button("🔗 Pagar no Cartão", info_pg[1], use_container_width=True)
     
     st.markdown("**Chave Pix:** `11994991465` (Hassan Marques)")
-    st.warning("⚠️ **Informação Importante:** Uma vez que o pagamento for finalizado, a compra é encerrada.")
+    st.warning("""
+    ⚠️ **Informação Importante:** Uma vez que o link for finalizado, acabou aquela compra. Não podendo comprar em parcelas. 
+    *Exemplo: Comprou 1 Camiseta e 1 Boné e finalizou o link, se quiser comprar mais uma camiseta não terá aplicação de desconto.*
+    """)
 
     with st.form("checkout"):
         n = st.text_input("Nome Completo")
