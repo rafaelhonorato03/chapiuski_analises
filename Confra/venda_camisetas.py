@@ -107,7 +107,7 @@ dados_venda = {}
 # Exibição do Boné
 if q_bone > 0:
     st.divider()
-    exibir_imagem_segura("BONE.jpeg", cap="Modelo Boné", w=250)
+    exibir_imagem_segura("BONE.jpeg", cap="Modelo Boné")
 
 # Exibição das Artes das Camisetas
 if q_comf > 0 or q_over > 0:
