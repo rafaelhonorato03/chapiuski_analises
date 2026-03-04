@@ -57,7 +57,6 @@ LINKS_CARTAO = {
 }
 
 def enviar_emails(dados, arquivo_comprovante):
-    # Gerar o CSV com os dados do pedido (somente colunas de interesse)
     df = pd.DataFrame([dados])
     csv_buffer = io.StringIO()
     df.to_csv(csv_buffer, index=False, sep=';', encoding='utf-8-sig')
@@ -77,7 +76,7 @@ def enviar_emails(dados, arquivo_comprovante):
     - Camisetas Comfort: {dados.get('qtd_confort', 0)}
     - Camisetas Oversized: {dados.get('qtd_over', 0)}
     --------------------------------------
-    Verifique os arquivos anexos para o comprovante e a planilha de dados.
+    Verifique os arquivos anexos para os detalhes.
     """
     
     msg = MIMEMultipart()
@@ -86,14 +85,12 @@ def enviar_emails(dados, arquivo_comprovante):
     msg['To'] = EMAIL_DESTINATARIO
     msg.attach(MIMEText(resumo, 'plain'))
 
-    # Anexo 1: Planilha de Dados (CSV)
     part_csv = MIMEBase('application', "octet-stream")
     part_csv.set_payload(csv_buffer.getvalue().encode('utf-8-sig'))
     encoders.encode_base64(part_csv)
     part_csv.add_header('Content-Disposition', 'attachment; filename="dados_pedido.csv"')
     msg.attach(part_csv)
 
-    # Anexo 2: Comprovante
     if arquivo_comprovante:
         part_img = MIMEBase('application', "octet-stream")
         part_img.set_payload(arquivo_comprovante.getvalue())
@@ -148,8 +145,9 @@ if q_comfort > 0 or q_over > 0:
         for i in range(q_comfort):
             with st.expander(f"Configurar Comfort #{i+1}", expanded=True):
                 c1, c2 = st.columns(2)
-                dados_venda[f"comfort_{i+1}_arte"] = c1.radio(f"Arte (C#{i+1})", ["Comfort Arte Degradê", "Comfort Arte Logo"], key=f"ac{i}")
-                dados_venda[f"comfort_{i+1}_tam"] = c2.selectbox(f"Tam (C#{i+1})", ["P", "M", "G", "GG", "XGG"], key=f"tc{i}")
+                # Note: Chave da coluna mantida como 'confort' para o Supabase
+                dados_venda[f"confort_{i+1}_arte"] = c1.radio(f"Arte (C#{i+1})", ["Comfort Arte Degradê", "Comfort Arte Logo"], key=f"ac{i}")
+                dados_venda[f"confort_{i+1}_tam"] = c2.selectbox(f"Tam (C#{i+1})", ["P", "M", "G", "GG", "XGG"], key=f"tc{i}")
 
     if q_over > 0:
         for i in range(q_over):
@@ -169,10 +167,7 @@ if any(total_tupla):
     sobra_over = q_over - num_kits
     valor_final = (num_kits * 195.0) + (sobra_bone * 50.0) + (sobra_comfort * 80.0) + (sobra_over * 80.0)
     
-    if num_kits > 0:
-        st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f} ({num_kits} Kit(s) aplicado!)")
-    else:
-        st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f}")
+    st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f}")
 
     info_pg = LINKS_CARTAO.get(total_tupla)
     if info_pg:
@@ -180,11 +175,7 @@ if any(total_tupla):
         st.link_button("🔗 Pagar no Cartão", info_pg[1], use_container_width=True)
     
     st.markdown("**Chave Pix:** `11994991465` (Hassan Marques)")
-
-    st.warning("""
-    ⚠️ **Informação Importante:** Uma vez que o pagamento for finalizado, a compra é encerrada. Não é possível aplicar descontos retroativos ou "completar" kits em pedidos separados. 
-    *Exemplo: Se comprar 1 Camiseta e 1 Boné agora, e depois decidir comprar outra camiseta, o sistema não aplicará o desconto de kit no segundo pedido.*
-    """)
+    st.warning("⚠️ **Informação Importante:** Uma vez que o pagamento for finalizado, a compra é encerrada.")
 
     with st.form("checkout"):
         n = st.text_input("Nome Completo")
@@ -197,7 +188,7 @@ if any(total_tupla):
                 try:
                     p = {
                         "nome_comprador": n, "email_comprador": e, "whatsapp_comprador": w,
-                        "qtd_bone_avulso": q_bone, "qtd_confort": q_comfort, "qtd_over": q_over,
+                        "qtd_bone_avulso": q_bone, "qtd_confort": q_comfort, "qtd_over": q_over, # Colunas ajustadas para confort
                         "valor_total": float(valor_final), "created_at": datetime.now().isoformat(),
                         **dados_venda
                     }
