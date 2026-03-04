@@ -58,54 +58,61 @@ LINKS_CARTAO = {
 
 def enviar_emails(dados_atuais, arquivo_comprovante):
     try:
-        # BUSCA O HISTÓRICO COMPLETO DO SUPABASE
-        resposta = supabase.table("compra_confra").select("*").execute()
+        # Busca apenas a partir do ID 54
+        resposta = supabase.table("compra_confra").select("*").gte("id", 54).execute()
         historico = resposta.data
         
-        # Converte para DataFrame para gerar o CSV
-        df_historico = pd.DataFrame(historico)
-        
-        # Gera o CSV em memória
-        csv_buffer = io.StringIO()
-        df_historico.to_csv(csv_buffer, index=False, sep=';', encoding='utf-8-sig')
-        
-        resumo = f"""
-        ✅ NOVO PEDIDO REGISTRADO - CHAPIUSKI 2026
-        ------------------------------------------
-        Comprador Atual: {dados_atuais['nome_comprador']}
-        Valor: R$ {dados_atuais['valor_total']:.2f}
-        
-        📎 O arquivo 'historico_vendas.csv' em anexo contém 
-        TODOS os pedidos realizados até o momento.
-        ------------------------------------------
-        """
-        
-        msg = MIMEMultipart()
-        msg['Subject'] = f"📈 NOVO PEDIDO + HISTÓRICO: {dados_atuais['nome_comprador']}"
-        msg['From'] = EMAIL_REMETENTE
-        msg['To'] = EMAIL_DESTINATARIO
-        msg.attach(MIMEText(resumo, 'plain'))
+        if historico:
+            df_historico = pd.DataFrame(historico)
+            
+            # Seleciona apenas as colunas pertinentes (ignorando metadados internos se existirem)
+            colunas_finais = [
+                'id', 'created_at', 'nome_comprador', 'whatsapp_comprador', 'email_comprador',
+                'qtd_bone_avulso', 'qtd_confort', 'qtd_over', 'valor_total',
+                'confort_1_arte', 'confort_1_tam', 'confort_2_arte', 'confort_2_tam',
+                'over_1_arte', 'over_1_tam', 'over_2_arte', 'over_2_tam'
+            ]
+            # Garante que só tentará filtrar colunas que realmente existem no DataFrame
+            df_filtrado = df_historico[[c for c in colunas_finais if c in df_historico.columns]]
+            
+            csv_buffer = io.StringIO()
+            df_filtrado.to_csv(csv_buffer, index=False, sep=';', encoding='utf-8-sig')
+            
+            resumo = f"""
+            ✅ NOVO PEDIDO REGISTRADO - CHAPIUSKI 2026
+            ------------------------------------------
+            Comprador Atual: {dados_atuais['nome_comprador']}
+            Valor: R$ {dados_atuais['valor_total']:.2f}
+            
+            📎 O arquivo 'historico_vendas.csv' em anexo contém 
+            os pedidos realizados a partir do ID 54.
+            ------------------------------------------
+            """
+            
+            msg = MIMEMultipart()
+            msg['Subject'] = f"📈 NOVO PEDIDO + HISTÓRICO: {dados_atuais['nome_comprador']}"
+            msg['From'] = EMAIL_REMETENTE
+            msg['To'] = EMAIL_DESTINATARIO
+            msg.attach(MIMEText(resumo, 'plain'))
 
-        # Anexo 1: Histórico Completo (CSV)
-        part_csv = MIMEBase('application', "octet-stream")
-        part_csv.set_payload(csv_buffer.getvalue().encode('utf-8-sig'))
-        encoders.encode_base64(part_csv)
-        part_csv.add_header('Content-Disposition', 'attachment; filename="historico_vendas.csv"')
-        msg.attach(part_csv)
+            part_csv = MIMEBase('application', "octet-stream")
+            part_csv.set_payload(csv_buffer.getvalue().encode('utf-8-sig'))
+            encoders.encode_base64(part_csv)
+            part_csv.add_header('Content-Disposition', 'attachment; filename="historico_vendas.csv"')
+            msg.attach(part_csv)
 
-        # Anexo 2: Comprovante da compra atual
-        if arquivo_comprovante:
-            part_img = MIMEBase('application', "octet-stream")
-            part_img.set_payload(arquivo_comprovante.getvalue())
-            encoders.encode_base64(part_img)
-            part_img.add_header('Content-Disposition', 'attachment; filename="comprovante.png"')
-            msg.attach(part_img)
+            if arquivo_comprovante:
+                part_img = MIMEBase('application', "octet-stream")
+                part_img.set_payload(arquivo_comprovante.getvalue())
+                encoders.encode_base64(part_img)
+                part_img.add_header('Content-Disposition', 'attachment; filename="comprovante.png"')
+                msg.attach(part_img)
 
-        destinatarios = [d.strip() for d in EMAIL_DESTINATARIO.split(",")]
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(EMAIL_REMETENTE, EMAIL_SENHA)
-            server.sendmail(EMAIL_REMETENTE, destinatarios, msg.as_string())
-            server.sendmail(EMAIL_REMETENTE, [dados_atuais['email_comprador']], msg.as_string())
+            destinatarios = [d.strip() for d in EMAIL_DESTINATARIO.split(",")]
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+                server.login(EMAIL_REMETENTE, EMAIL_SENHA)
+                server.sendmail(EMAIL_REMETENTE, destinatarios, msg.as_string())
+                server.sendmail(EMAIL_REMETENTE, [dados_atuais['email_comprador']], msg.as_string())
             
     except Exception as e:
         st.error(f"Erro ao gerar histórico/enviar e-mail: {e}")
@@ -172,7 +179,10 @@ if any(total_tupla):
     sobra_over = q_over - num_kits
     valor_final = (num_kits * 195.0) + (sobra_bone * 50.0) + (sobra_comfort * 80.0) + (sobra_over * 80.0)
     
-    st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f}")
+    if num_kits > 0:
+        st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f} ({num_kits} Kit(s) aplicado!)")
+    else:
+        st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f}")
 
     info_pg = LINKS_CARTAO.get(total_tupla)
     if info_pg:
@@ -180,6 +190,7 @@ if any(total_tupla):
         st.link_button("🔗 Pagar no Cartão", info_pg[1], use_container_width=True)
     
     st.markdown("**Chave Pix:** `11994991465` (Hassan Marques)")
+
     st.warning("""
     ⚠️ **Informação Importante:** Uma vez que o link for finalizado, acabou aquela compra. Não podendo comprar em parcelas. 
     *Exemplo: Comprou 1 Camiseta e 1 Boné e finalizou o link, se quiser comprar mais uma camiseta não terá aplicação de desconto.*
@@ -200,12 +211,8 @@ if any(total_tupla):
                         "valor_total": float(valor_final), "created_at": datetime.now().isoformat(),
                         **dados_venda
                     }
-                    # Primeiro insere no banco para garantir que a consulta posterior pegue a venda atual
                     supabase.table("compra_confra").insert(p).execute()
-                    
-                    # Agora envia o e-mail pegando o histórico atualizado do banco
                     enviar_emails(p, comp)
-                    
                     st.success("Pedido registrado e histórico enviado!")
                     st.balloons()
                 except Exception as ex: st.error(f"Erro: {ex}")
