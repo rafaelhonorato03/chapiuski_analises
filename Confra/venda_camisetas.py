@@ -93,12 +93,12 @@ def enviar_emails(dados, arquivo):
 
 # ==== Interface ====
 exibir_imagem_segura("Central.jpeg")
-st.title("👕 Chapiuski 2026")
+st.title("👕🧢 CLinha Casual 2026")
 
 # 1. Quantidades
 st.subheader("1. Escolha as quantidades")
 col_q1, col_q2, col_q3 = st.columns(3)
-with col_q1: q_bone = st.number_input("Bonés (R$ 50)", 0, 2, 0)
+with col_q1: q_bone = st.number_input("Boné (R$ 50)", 0, 2, 0)
 with col_q2: q_comf = st.number_input("Comfort (R$ 80)", 0, 2, 0)
 with col_q3: q_over = st.number_input("Oversized (R$ 80)", 0, 2, 0)
 
@@ -137,7 +137,7 @@ if q_comf > 0 or q_over > 0:
         for i in range(q_comf):
             with st.expander(f"Configurar Comfort #{i+1}", expanded=True):
                 c1, c2 = st.columns(2)
-                dados_venda[f"comf_{i+1}_arte"] = c1.radio(f"Arte (C#{i+1})", ["Confort Arte Degradê", "Confort Arte Logo"], key=f"ac{i}")
+                dados_venda[f"comf_{i+1}_arte"] = c1.radio(f"Arte (C#{i+1})", ["Comfort Arte Degradê", "Comfort Arte Logo"], key=f"ac{i}")
                 dados_venda[f"comf_{i+1}_tam"] = c2.selectbox(f"Tam (C#{i+1})", ["P", "M", "G", "GG", "XGG"], key=f"tc{i}")
 
     if q_over > 0:
@@ -171,6 +171,11 @@ if any(total_tupla):
         st.link_button("🔗 Pagar no Cartão", info_pg[1], use_container_width=True)
     
     st.markdown("**Chave Pix:** `11994991465` (Hassan Marques)")
+
+    st.warning("""
+    ⚠️ **Informação Importante:** Uma vez que o pagamento for finalizado, a compra é encerrada. Não é possível aplicar descontos retroativos ou "completar" kits em pedidos separados. 
+    *Exemplo: Se comprar 1 Camiseta e 1 Boné agora, e depois decidir comprar outra camiseta, o sistema não aplicará o desconto de kit no segundo pedido.*
+    """)
 
     with st.form("checkout"):
         n = st.text_input("Nome Completo")
