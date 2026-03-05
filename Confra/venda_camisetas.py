@@ -43,8 +43,6 @@ LINKS_CARTAO = {
     (2, 0, 0): ("R$ 105,26", "https://pag.ae/81xQ3H_-u"),
     (0, 2, 0): ("R$ 168,41", "https://pag.ae/81xQ2ZREs"),
     (0, 0, 2): ("R$ 168,41", "https://pag.ae/81xQ2ZREs"),
-    (2, 2, 0): ("R$ 273,66", "https://pag.ae/81xQ47U-u"),
-    (2, 0, 2): ("R$ 273,66", "https://pag.ae/81xQ47U-u"),
     (0, 2, 2): ("R$ 336,81", "https://pag.ae/81xQ4QRsR"),
     (1, 1, 1): ("R$ 205,25", "https://pag.ae/81xQ576S5"),
     (1, 1, 2): ("R$ 289,45", "https://pag.ae/81xQ5uSev"),
@@ -55,7 +53,13 @@ LINKS_CARTAO = {
     (2, 1, 2): ("R$ 342,07", "https://pag.ae/81xQ7gX7R"),
     (2, 2, 1): ("R$ 342,07", "https://pag.ae/81xQ7gX7R"),
     (1, 0, 2): ("R$ 205,25", "https://pag.ae/81xQ576S5"),
-    (1, 2, 0): ("R$ 205,25", "https://pag.ae/81xQ576S5")
+    (1, 2, 0): ("R$ 205,25", "https://pag.ae/81xQ576S5"),
+    (2, 1, 0): ("R$ 189,46", "https://pag.ae/81yXHu1r9"),
+    (2, 0, 1): ("R$ 189,46", "https://pag.ae/81yXHu1r9"),
+    (2, 0, 2): ("R$ 257,87", "https://pag.ae/81xQ6KEjv"),
+    (2, 2, 0): ("R$ 257,87", "https://pag.ae/81xQ6KEjv"),
+    (0, 1, 2): ("R$ 252,61", "https://pag.ae/81yXJbAjq"),
+    (0, 2, 1): ("R$ 252,61", "https://pag.ae/81yXJbAjq")
 }
 
 def enviar_emails(dados_atuais, arquivo_comprovante):
