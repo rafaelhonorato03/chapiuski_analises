@@ -179,24 +179,27 @@ if any(total_tupla):
     
     total_camisetas = q_comfort + q_over
     
-    # O número de kits é limitado por:
-    # 1. Quantos bonés eu tenho
-    # 2. Quantos pares de camisetas (total_camisetas // 2) eu consigo formar
+    # O Kit promocional de R$ 195 é 1 Boné + 2 Camisetas.
+    # Calculamos quantos desses trios conseguimos formar:
     num_kits = min(q_bone, total_camisetas // 2)
     
-    # Cálculo das sobras (o que não entrou em nenhum kit de 1+2)
+    # O que sobra do Boné após formar os kits
     sobra_bone = q_bone - num_kits
+    
+    # O que sobra de camisetas após formar os kits
     sobra_camisetas = total_camisetas - (num_kits * 2)
     
-    # Preços: Kit(1+2) = 195.00 | Boné avulso = 50.00 | Camiseta avulsa = 80.00
+    # Cálculo:
+    # (Kits * 195) + (Bonés que sobraram * 50) + (Camisetas que sobraram * 80)
     valor_final = (num_kits * 195.0) + (sobra_bone * 50.0) + (sobra_camisetas * 80.0)
     
+    # Exibição
     if num_kits > 0:
-        st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f} ({num_kits} Kit(s) 1+2 aplicado!)")
+        st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f} ({num_kits} Kit(s) aplicado!)")
     else:
         st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f}")
 
-    # Verifica se a combinação exata existe nos links de cartão
+    # Link do Cartão (Busca na sua tabela LINKS_CARTAO)
     info_pg = LINKS_CARTAO.get(total_tupla)
     if info_pg:
         st.write(f"💳 Cartão/Boleto: {info_pg[0]}")
