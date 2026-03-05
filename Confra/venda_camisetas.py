@@ -171,28 +171,32 @@ if q_comfort > 0 or q_over > 0:
 # ==== Lógica de Preço Inteligente ====
 total_tupla = (q_bone, q_comfort, q_over)
 
+# ==== Lógica de Preço Inteligente: 1 Boné + 2 Camisetas ====
+total_tupla = (q_bone, q_comfort, q_over)
+
 if any(total_tupla):
     st.divider()
     
-    # O kit é 1 Boné + 1 Camiseta (qualquer uma das duas)
     total_camisetas = q_comfort + q_over
     
-    # O número de kits é o limite de quantos pares (1 boné + 1 camiseta) conseguimos formar
-    num_kits = min(q_bone, total_camisetas)
+    # O número de kits é limitado por:
+    # 1. Quantos bonés eu tenho
+    # 2. Quantos pares de camisetas (total_camisetas // 2) eu consigo formar
+    num_kits = min(q_bone, total_camisetas // 2)
     
-    # Calculando as sobras
-    # Primeiro tiramos as camisetas do kit (priorizando nenhuma, pois o preço é igual)
+    # Cálculo das sobras (o que não entrou em nenhum kit de 1+2)
     sobra_bone = q_bone - num_kits
-    sobra_camisetas = total_camisetas - num_kits
+    sobra_camisetas = total_camisetas - (num_kits * 2)
     
-    # Preços: Kit = 195.00 | Boné avulso = 50.00 | Camiseta avulsa = 80.00
+    # Preços: Kit(1+2) = 195.00 | Boné avulso = 50.00 | Camiseta avulsa = 80.00
     valor_final = (num_kits * 195.0) + (sobra_bone * 50.0) + (sobra_camisetas * 80.0)
     
     if num_kits > 0:
-        st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f} ({num_kits} Kit(s) aplicado!)")
+        st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f} ({num_kits} Kit(s) 1+2 aplicado!)")
     else:
         st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f}")
 
+    # Verifica se a combinação exata existe nos links de cartão
     info_pg = LINKS_CARTAO.get(total_tupla)
     if info_pg:
         st.write(f"💳 Cartão/Boleto: {info_pg[0]}")
