@@ -54,6 +54,8 @@ LINKS_CARTAO = {
     (2, 1, 1): ("R$ 257,87", "https://pag.ae/81xQ6KEjv"),
     (2, 1, 2): ("R$ 342,07", "https://pag.ae/81xQ7gX7R"),
     (2, 2, 1): ("R$ 342,07", "https://pag.ae/81xQ7gX7R"),
+    (1, 0, 2): ("R$ 205,25", "https://pag.ae/81xQ576S5"),
+    (1, 2, 0): ("R$ 205,25", "https://pag.ae/81xQ576S5")
 }
 
 def enviar_emails(dados_atuais, arquivo_comprovante):
