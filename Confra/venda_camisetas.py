@@ -173,11 +173,20 @@ total_tupla = (q_bone, q_comfort, q_over)
 
 if any(total_tupla):
     st.divider()
-    num_kits = min(q_bone, q_comfort, q_over)
+    
+    # O kit é 1 Boné + 1 Camiseta (qualquer uma das duas)
+    total_camisetas = q_comfort + q_over
+    
+    # O número de kits é o limite de quantos pares (1 boné + 1 camiseta) conseguimos formar
+    num_kits = min(q_bone, total_camisetas)
+    
+    # Calculando as sobras
+    # Primeiro tiramos as camisetas do kit (priorizando nenhuma, pois o preço é igual)
     sobra_bone = q_bone - num_kits
-    sobra_comfort = q_comfort - num_kits
-    sobra_over = q_over - num_kits
-    valor_final = (num_kits * 195.0) + (sobra_bone * 50.0) + (sobra_comfort * 80.0) + (sobra_over * 80.0)
+    sobra_camisetas = total_camisetas - num_kits
+    
+    # Preços: Kit = 195.00 | Boné avulso = 50.00 | Camiseta avulsa = 80.00
+    valor_final = (num_kits * 195.0) + (sobra_bone * 50.0) + (sobra_camisetas * 80.0)
     
     if num_kits > 0:
         st.success(f"### 🎯 Total no Pix: R$ {valor_final:.2f} ({num_kits} Kit(s) aplicado!)")
