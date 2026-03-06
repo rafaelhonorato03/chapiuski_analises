@@ -64,61 +64,94 @@ LINKS_CARTAO = {
 
 def enviar_emails(dados_atuais, arquivo_comprovante):
     try:
-        # Busca apenas a partir do ID 54
+        # 1. Busca histórico no Supabase para a sua planilha
         resposta = supabase.table("compra_confra").select("*").gte("id", 54).execute()
         historico = resposta.data
         
+        csv_buffer = io.StringIO()
         if historico:
             df_historico = pd.DataFrame(historico)
-            
-            # Seleciona apenas as colunas pertinentes (ignorando metadados internos se existirem)
             colunas_finais = [
                 'id', 'created_at', 'nome_comprador', 'whatsapp_comprador', 'email_comprador',
                 'qtd_bone_avulso', 'qtd_confort', 'qtd_over', 'valor_total',
                 'confort_1_arte', 'confort_1_tam', 'confort_2_arte', 'confort_2_tam',
                 'over_1_arte', 'over_1_tam', 'over_2_arte', 'over_2_tam'
             ]
-            # Garante que só tentará filtrar colunas que realmente existem no DataFrame
             df_filtrado = df_historico[[c for c in colunas_finais if c in df_historico.columns]]
-            
-            csv_buffer = io.StringIO()
             df_filtrado.to_csv(csv_buffer, index=False, sep=';', encoding='utf-8-sig')
-            
-            resumo = f"""
-            ✅ NOVO PEDIDO REGISTRADO - CHAPIUSKI 2026
-            ------------------------------------------
-            Comprador Atual: {dados_atuais['nome_comprador']}
-            Valor: R$ {dados_atuais['valor_total']:.2f}
-            
-            📎 O arquivo 'historico_vendas.csv' em anexo contém 
-            os pedidos realizados a partir do ID 54.
-            ------------------------------------------
-            """
-            
-            msg = MIMEMultipart()
-            msg['Subject'] = f"📈 NOVO PEDIDO + HISTÓRICO: {dados_atuais['nome_comprador']}"
-            msg['From'] = EMAIL_REMETENTE
-            msg['To'] = EMAIL_DESTINATARIO
-            msg.attach(MIMEText(resumo, 'plain'))
 
+        # --- PREPARAÇÃO DO CONTEÚDO DE PERSONALIZAÇÃO ---
+        detalhes = ""
+        for i in range(1, 3):
+            if f"confort_{i}_arte" in dados_atuais:
+                detalhes += f"- Comfort #{i}: {dados_atuais[f'confort_{i}_arte']} (Tam: {dados_atuais[f'confort_{i}_tam']})\n"
+            if f"over_{i}_arte" in dados_atuais:
+                detalhes += f"- Oversized #{i}: {dados_atuais[f'over_{i}_arte']} (Tam: {dados_atuais[f'over_{i}_tam']})\n"
+
+        # ==========================================
+        # E-MAIL 1: PARA O COMPRADOR (SEM PLANILHA)
+        # ==========================================
+        msg_comprador = MIMEMultipart()
+        msg_comprador['Subject'] = f"✅ Pedido Confirmado! - {dados_atuais['nome_comprador']}"
+        msg_comprador['From'] = EMAIL_REMETENTE
+        msg_comprador['To'] = dados_atuais['email_comprador']
+
+        corpo_comprador = f"""
+Olá {dados_atuais['nome_comprador']}, seu pedido foi recebido!
+
+RESUMO:
+- Bonés: {dados_atuais['qtd_bone_avulso']}
+- Camisetas Comfort: {dados_atuais['qtd_confort']}
+- Camisetas Oversized: {dados_atuais['qtd_over']}
+
+DETALHES:
+{detalhes if detalhes else "Nenhum item personalizável."}
+
+VALOR TOTAL: R$ {dados_atuais['valor_total']:.2f}
+WhatsApp cadastrado: {dados_atuais['whatsapp_comprador']}
+
+Obrigado por fazer parte do Chapiuski!
+        """
+        msg_comprador.attach(MIMEText(corpo_comprador, 'plain'))
+
+        # ==========================================
+        # E-MAIL 2: PARA VOCÊ (COM PLANILHA E COMPROVANTE)
+        # ==========================================
+        msg_admin = MIMEMultipart()
+        msg_admin['Subject'] = f"📈 NOVO PEDIDO: {dados_atuais['nome_comprador']}"
+        msg_admin['From'] = EMAIL_REMETENTE
+        msg_admin['To'] = EMAIL_DESTINATARIO
+
+        corpo_admin = f"Novo pedido registrado.\nComprador: {dados_atuais['nome_comprador']}\nValor: R$ {dados_atuais['valor_total']:.2f}\n\nPlanilha de histórico e comprovante seguem em anexo."
+        msg_admin.attach(MIMEText(corpo_admin, 'plain'))
+
+        # Anexa Planilha (APENAS NO E-MAIL ADMIN)
+        if historico:
             part_csv = MIMEBase('application', "octet-stream")
             part_csv.set_payload(csv_buffer.getvalue().encode('utf-8-sig'))
             encoders.encode_base64(part_csv)
             part_csv.add_header('Content-Disposition', 'attachment; filename="historico_vendas.csv"')
-            msg.attach(part_csv)
+            msg_admin.attach(part_csv)
 
-            if arquivo_comprovante:
-                part_img = MIMEBase('application', "octet-stream")
-                part_img.set_payload(arquivo_comprovante.getvalue())
-                encoders.encode_base64(part_img)
-                part_img.add_header('Content-Disposition', 'attachment; filename="comprovante.png"')
-                msg.attach(part_img)
+        # Anexa Comprovante (APENAS NO E-MAIL ADMIN)
+        if arquivo_comprovante:
+            part_img = MIMEBase('application', "octet-stream")
+            part_img.set_payload(arquivo_comprovante.getvalue())
+            encoders.encode_base64(part_img)
+            part_img.add_header('Content-Disposition', 'attachment; filename="comprovante.png"')
+            msg_admin.attach(part_img)
 
-            destinatarios = [d.strip() for d in EMAIL_DESTINATARIO.split(",")]
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-                server.login(EMAIL_REMETENTE, EMAIL_SENHA)
-                server.sendmail(EMAIL_REMETENTE, destinatarios, msg.as_string())
-                server.sendmail(EMAIL_REMETENTE, [dados_atuais['email_comprador']], msg.as_string())
+        # --- ENVIO FINAL ---
+        destinatarios_admin = [d.strip() for d in EMAIL_DESTINATARIO.split(",")]
+        
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(EMAIL_REMETENTE, EMAIL_SENHA)
+            
+            # Envia para você/admins
+            server.sendmail(EMAIL_REMETENTE, destinatarios_admin, msg_admin.as_string())
+            
+            # Envia para o comprador
+            server.sendmail(EMAIL_REMETENTE, [dados_atuais['email_comprador']], msg_comprador.as_string())
             
     except Exception as e:
         st.error(f"Erro ao gerar histórico/enviar e-mail: {e}")
