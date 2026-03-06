@@ -122,7 +122,26 @@ Obrigado por fazer parte do Chapiuski!
         msg_admin['From'] = EMAIL_REMETENTE
         msg_admin['To'] = EMAIL_DESTINATARIO
 
-        corpo_admin = f"Novo pedido registrado.\nComprador: {dados_atuais['nome_comprador']}\nValor: R$ {dados_atuais['valor_total']:.2f}\n\nPlanilha de histórico e comprovante seguem em anexo."
+        corpo_admin = f"""
+        NOVO PEDIDO REGISTRADO - CHAPIUSKI 2026
+        ------------------------------------------
+        COMPRADOR: {dados_atuais['nome_comprador']}
+        WHATSAPP: {dados_atuais['whatsapp_comprador']}
+        E-MAIL: {dados_atuais['email_comprador']}
+        ------------------------------------------
+        ITENS:
+        - Bonés: {dados_atuais['qtd_bone_avulso']}
+        - Comfort: {dados_atuais['qtd_confort']}
+        - Oversized: {dados_atuais['qtd_over']}
+        
+        DETALHES DE TAMANHO/ARTE:
+        {detalhes if detalhes else "Nenhuma personalização."}
+        ------------------------------------------
+        VALOR TOTAL: R$ {dados_atuais['valor_total']:.2f}
+        
+        📎 O comprovante e a planilha seguem em anexo.
+        ------------------------------------------
+        """
         msg_admin.attach(MIMEText(corpo_admin, 'plain'))
 
         # Anexa Planilha (APENAS NO E-MAIL ADMIN)
