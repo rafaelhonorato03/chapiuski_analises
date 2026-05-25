@@ -8,36 +8,35 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from supabase import create_client, Client
-from sib_api_v3_sdk.rest import ApiException
-from pprint import pprint
-from dotenv import load_dotenv
-from google.oauth2.service_account import Credentials
 import re
+from dotenv import load_dotenv
+import io  # Importado para processar o CSV diretamente na memória RAM
 
 # === Carregar Variáveis de Ambiente ===
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
+
+st.set_page_config(page_title="Ingressos - Festa Chapiuski", layout="wide")
 
 # === Inicializar Supabase ===
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-arquivo_csv = os.path.join(os.path.dirname(__file__), "compras_ingressos.csv")
 
 def email_valido(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
-def enviar_email(remetente, senha, destinatarios, assunto, corpo, comprovante, arquivo_csv):
+
+def enviar_email(remetente, senha, destinatarios, assunto, corpo, comprovante, csv_bytes):
     msg = MIMEMultipart()
     msg['Subject'] = assunto
     msg['From'] = remetente
     msg['To'] = ", ".join(destinatarios)
     msg.attach(MIMEText(corpo, 'plain'))
 
-    # Anexa o comprovante
+    # Anexo do Comprovante (Upload do usuário)
     if comprovante is not None:
         part = MIMEBase('application', "octet-stream")
         file_data = comprovante.getvalue()
@@ -46,108 +45,74 @@ def enviar_email(remetente, senha, destinatarios, assunto, corpo, comprovante, a
         part.add_header('Content-Disposition', f'attachment; filename="{comprovante.name}"')
         msg.attach(part)
 
-    # Anexa o CSV como backup
-    if os.path.exists(arquivo_csv):
-        with open(arquivo_csv, "rb") as f:
-            part_csv = MIMEBase('application', "octet-stream")
-            part_csv.set_payload(f.read())
-            encoders.encode_base64(part_csv)
-            part_csv.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(arquivo_csv)}"')
-            msg.attach(part_csv)
+    # Anexo do CSV Filtrado (Gerado dinamicamente na memória)
+    if csv_bytes is not None:
+        part_csv = MIMEBase('application', "octet-stream")
+        part_csv.set_payload(csv_bytes)
+        encoders.encode_base64(part_csv)
+        part_csv.add_header('Content-Disposition', 'attachment; filename="compras_ingressos.csv"')
+        msg.attach(part_csv)
 
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(remetente, senha)
         server.sendmail(remetente, destinatarios, msg.as_string())
 
-# === Função para buscar total de ingressos vendidos ===
-def buscar_total_vendido():
-    response = supabase.table("compra_ingressos").select("quantidade").execute()
-    if response.data:
-        total = sum(item["quantidade"] for item in response.data)
-        return total
-    return 0
 
-# === Controle de Lotes ===
-estoque_lotes = {
-    "1º LOTE PROMOCIONAL": 35,
-    "2º LOTE": 65,
-}
+# =========================================================================
+# === CONTROLE MANUAL DE LOTES E LINKS (VIRE AQUI QUANDO PRECISAR) ========
+# =========================================================================
+LOTE_MANUAL = "UNICO"  # Opções: "UNICO" ou "PORTA"
+# =========================================================================
 
-total_vendidos = buscar_total_vendido()
+MAX_INGRESSOS = 3 
 
-#if total_vendidos < estoque_lotes["1º LOTE PROMOCIONAL"]:
-    #lote_atual = "1º LOTE PROMOCIONAL"
-    #link_pagamento = "https://pag.ae/7_FMHdgNJ"
-    #estoque_disponivel = estoque_lotes["1º LOTE PROMOCIONAL"] - total_vendidos
-    #lote_info = "R&#36; 100,00 no PIX ou R&#36; 105,00 no link (até 10x)"
-#elif total_vendidos < (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]):
-    #lote_atual = "2º LOTE"
-    #link_pagamento = "https://pag.ae/7_FMKBcQs"
-    #estoque_disponivel = (estoque_lotes["1º LOTE PROMOCIONAL"] + estoque_lotes["2º LOTE"]) - total_vendidos
-    #lote_info = "R&#36; 120,00 no PIX ou R&#36; 125,00 no link (até 10x)"
-#else:
-    #lote_atual = "Ingressos esgotados"
-    #link_pagamento = None
-    #estoque_disponivel = 0
-    #lote_info = ""
+# Título do App
+st.title("Ingressos - Festa Chapiuski 2026")
 
-# Ingressos esgotados
-lote_atual = "Ingressos esgotados"
-link_pagamento = None
-estoque_disponivel = 0
-lote_info = ""
+# Seleção de quantidade de ingressos
+quantidade = st.number_input(
+    "Quantidade de ingressos",
+    min_value=1,
+    max_value=MAX_INGRESSOS,
+    value=1,
+    step=1
+)
 
-# === Função para sincronizar o CSV com o Supabase ===
-def sincronizar_csv_com_supabase():
-    try:
-        response = supabase.table("compra_ingressos").select("*").execute()
-        if response.data:
-            df = pd.DataFrame(response.data)
-            df.to_csv(arquivo_csv, index=False, encoding="utf-8")
-            print("✅ CSV sincronizado com o Supabase.")
-        else:
-            # Se não houver dados, cria um CSV vazio com as colunas padrão
-            colunas = ["email", "quantidade", "nomes", "documentos", "datahora", "lote"]
-            df = pd.DataFrame(columns=colunas)
-            df.to_csv(arquivo_csv, index=False, encoding="utf-8")
-            print("⚠️ CSV criado vazio, sem dados no Supabase.")
-    except Exception as e:
-        print(f"❌ Erro ao sincronizar CSV com Supabase: {e}")
+# Lógica de mapeamento dos links
+if LOTE_MANUAL == "UNICO":
+    lote_atual = "Lote Geral"
+    links_lote = {
+        1: ("https://pag.ae/81NJ3DfBa", "R$ 130,00 - R$ 135,41"),
+        2: ("https://pag.ae/81NJ3_6wa", "R$ 260,00 - R$ 270,82"),
+        3: ("https://pag.ae/81NJ4qHQv", "R$ 390,00 - R$ 406,23")
+    }
+    link_pagamento, preco_lote = links_lote[quantidade]
+    lote_info = f"Valor para {quantidade} ingresso(s): {preco_lote} no link."
+else:
+    lote_atual = "Lote Porta"
+    links_lote = {
+        1: ("https://pag.ae/81NJ4Xzb6", "R$ 155,00 - R$ 161,45"),
+        2: ("https://pag.ae/81NJ5qNKv", "R$ 310,00 - R$ 322,89"),
+        3: ("https://pag.ae/81NJ5JD2M", "R$ 465,00 - R$ 484,35")
+    }
+    link_pagamento, preco_lote = links_lote[quantidade]
+    lote_info = f"Valor para {quantidade} ingresso(s): {preco_lote} no link."
 
-# === Layout Streamlit ===
-st.title("Ingressos - Festa Chapiuski 2025")
 st.subheader(f"Lote atual: {lote_atual}")
 if lote_info:
     st.info(lote_info)
 
-if estoque_disponivel == 0:
-    st.warning("🚫 Ingressos esgotados!")
-    st.stop()
-
-# --- Layout ---
-col1, col2, col3 = st.columns([1,2,1])
-with col2:
-    st.image("Confra/chapiuski.jpg", width=800)
-
 st.markdown("""
-**🥩🍻 OPEN FOOD & OPEN BAR!**
-- Churrasco, guarnições, lanches de cupim e costela, chopp, vodka, cachaça, refrigerantes, sucos e água à vontade!
-
-**🎶 ATRAÇÃO IMPERDÍVEL!**
-- Grupo de pagode com o Alemão! Das 17h às 20h30 (com pausa de 30 min)
-
-**⏰ Encerramento: 22h**
-
 **💰 VALORES**
-- 1º LOTE PROMOCIONAL: **R&#36; 100,00 no PIX** ou **R&#36; 105,00 no link** (em até 10x)
-- 2º LOTE: **R&#36; 120,00 no PIX** ou **R&#36; 125,00 no link** (em até 10x)
+- Lote Único: **R$ 130,00** (Dinheiro/Pix) ou no link de acordo com a quantidade.
+- Lote Porta: **R$ 155,00** (Dinheiro/Pix) ou no link de acordo com a quantidade.
 
 **💳 FORMAS DE PAGAMENTO**
-- PIX com desconto: **(11)99499-1465**
-- Débito e Crédito: Link de pagamento abaixo (até 10x com taxa)
+- PIX com desconto: **(13)99133-7100**
+- Débito e Crédito: Link de pagamento gerado abaixo automaticamente após escolher a quantidade.
 
 **⚠️ REGRAS**
-- 👧👦 Crianças até 12 anos não pagam, mas é obrigatório enviar os dados da criança (nome completo e documento) para o WhatsApp (11) 99499-1465 para liberação da entrada.
+- 👧👦 Crianças até 12 anos não pagam, mas é obrigatório enviar os dados da criança (nome completo e documento) para o WhatsApp (13) 99133-7100 para liberação da entrada.
 - A partir de 13 anos, pagam valor integral.
 - Documento com foto obrigatório na entrada.
 - Elevador: uso exclusivo para idosos e PCD.
@@ -156,16 +121,8 @@ st.markdown("""
 
 ⚠️ Atenção: Compras realizadas não poderão ser canceladas nem reembolsadas.
 
-🎊 **Garanta já seu ingresso e venha comemorar o 8° ano do Chapiuski!** 🎊
+🎊 **Garanta já seu ingresso e venha comemorar o 9° ano do Chapiuski!** 🎊
 """)
-
-quantidade = st.number_input(
-    "Quantidade de ingressos",
-    min_value=1,
-    max_value=int(estoque_disponivel),
-    value=1,
-    step=1
-)
 
 if "botao_enviado" not in st.session_state:
     st.session_state.botao_enviado = False
@@ -186,7 +143,7 @@ with st.form("formulario_ingresso"):
         documentos.append(documento)
     
     if link_pagamento:
-        st.markdown(f"### 💳 [Clique aqui para pagar seu ingresso]({link_pagamento})")
+        st.markdown(f"### 💳 [Clique aqui para pagar seus {quantidade} ingresso(s)]({link_pagamento})")
 
     comprovante = st.file_uploader(
         "Envie o comprovante de pagamento (imagem ou PDF)",
@@ -196,14 +153,11 @@ with st.form("formulario_ingresso"):
     enviado = st.form_submit_button("Reservar ingresso e enviar confirmação",
                                     disabled=st.session_state.botao_enviado)
 
-# Processa o envio depois do formulário
 if enviado and not st.session_state.botao_enviado:
-    # Bloqueia o botão para não deixar enviar duas vezes
     st.session_state.botao_enviado = True
 
 # === Processamento ===
 if enviado:
-    # --- Validação dos campos ---
     if (
         email.strip() == "" or
         not email_valido(email) or
@@ -212,18 +166,20 @@ if enviado:
         comprovante is None
     ):
         st.warning("Por favor, preencha todos os campos corretamente e envie o comprovante antes de enviar o pedido.")
+        st.session_state.botao_enviado = False 
     else:
         try:
-            # --- Salvar no Supabase ---
             datahora = datetime.now().isoformat()
             data = {
                 "email": email,
                 "quantidade": quantidade,
                 "nomes": ', '.join(nomes),
                 "documentos": ', '.join(documentos),
-                "datahora": datetime.now().isoformat(),
+                "datahora": datahora,
                 "lote": lote_atual
             }
+            
+            # 1. Salva o novo registro no banco Supabase
             resposta = supabase.table("compra_ingressos").insert(data).execute()
 
             if resposta.data:
@@ -231,19 +187,9 @@ if enviado:
             else:
                 st.error("❌ Erro ao salvar no banco de dados.")
 
-            # --- Sincronizar CSV com Supabase ---
-            sincronizar_csv_com_supabase()
-
-            if os.path.exists(arquivo_csv):
-                df = pd.read_csv(arquivo_csv)
-                df = pd.concat([df, pd.DataFrame([data])], ignore_index=True)
-            else:
-                df = pd.DataFrame([data])
-            df.to_csv(arquivo_csv, index=False)
-
             st.success(f"Ingressos reservados para: {', '.join(nomes)}. Confira seu e-mail para mais informações.")
 
-            # --- Preparar e enviar e-mail ---
+            # 2. Configurações de credenciais de e-mail
             remetente = os.getenv("EMAIL_REMETENTE")
             senha = os.getenv("EMAIL_SENHA")
             destinatario = os.getenv("EMAIL_DESTINATARIO")
@@ -254,8 +200,33 @@ if enviado:
 
             lista_destinatarios = [d.strip() for d in destinatario.split(",")]
 
+            # 3. GERAÇÃO DO CSV FILTRADO DIRETAMENTE DA MEMÓRIA
+            csv_bytes = None
+            try:
+                # Busca todos os dados ordenando por 'datahora' para garantir consistência nas posições das linhas
+                response_db = supabase.table("compra_ingressos").select("*").order("datahora", desc=False).execute()
+                if response_db.data:
+                    df_completo = pd.DataFrame(response_db.data)
+                    
+                    # .iloc[282:] corta da linha 283 em diante (Python começa no índice 0)
+                    df_filtrado = df_completo[df_completo['id'] >= 283]
+                    
+                    # Filtra APENAS as colunas solicitadas
+                    colunas_desejadas = ["id", "datahora", "email", "quantidade", "nomes", "documentos", "lote"]
+                    
+                    # O .filter() ignora colunas que porventura não existam para evitar que o código quebre
+                    df_filtrado = df_filtrado[[col for col in colunas_desejadas if col in df_filtrado.columns]]
+
+                    # Converte em bytes sem criar nenhum arquivo local no Streamlit
+                    buffer_csv = io.BytesIO()
+                    df_filtrado.to_csv(buffer_csv, index=False, encoding="utf-8")
+                    csv_bytes = buffer_csv.getvalue()
+            except Exception as e:
+                st.error(f"Erro ao processar dados para o anexo CSV: {e}")
+
+            # 4. Corpo do e-mail textualmente
             corpo = f"""
-Novo pedido de ingresso:
+Novo pedido de ingresso ({lote_atual}):
 
 E-mail do responsável: {email}
 Quantidade de ingressos: {quantidade}
@@ -264,15 +235,16 @@ Data/Hora do pedido: {datahora}
 Participantes:
 """ + "\n".join([f"{i+1}. Nome: {nomes[i]}, Documento: {documentos[i]}" for i in range(quantidade)])
 
+            # 5. Envia o e-mail passando os bytes do CSV virtual
             try:
                 enviar_email(
                     remetente,
                     senha,
                     lista_destinatarios,
-                    "Novo pedido de ingresso",
+                    f"Novo pedido de ingresso - {lote_atual}",
                     corpo,
                     comprovante,
-                    arquivo_csv
+                    csv_bytes
                 )
                 st.success("Dados enviados por e-mail para a organização!")
             except Exception as e:
@@ -280,3 +252,4 @@ Participantes:
 
         except Exception as e:
             st.error(f"Erro geral no processamento: {e}")
+            st.session_state.botao_enviado = False
