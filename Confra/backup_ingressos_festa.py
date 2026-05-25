@@ -69,6 +69,8 @@ MAX_INGRESSOS = 3
 # Título do App
 st.title("Ingressos - Festa Chapiuski 2026")
 
+st.image("Confra/imagem.jpeg", use_container_width=True)
+
 # Seleção de quantidade de ingressos
 quantidade = st.number_input(
     "Quantidade de ingressos",
