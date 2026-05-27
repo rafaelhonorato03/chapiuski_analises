@@ -115,8 +115,7 @@ st.markdown("""
 - Débito e Crédito: Link de pagamento gerado abaixo automaticamente após escolher a quantidade.
 
 **⚠️ REGRAS**
-- 👧👦 Crianças até 12 anos não pagam, mas é obrigatório enviar os dados da criança (nome completo e documento) para o WhatsApp:
-            (13) 99133-7100 para liberação da entrada.
+- 👧👦 Crianças até 12 anos não pagam, mas é obrigatório enviar os dados da criança (nome completo e documento) para o WhatsApp (13)&nbsp;99133&#8209;7100 para liberação da entrada.
 - A partir de 13 anos, pagam valor integral.
 - Documento com foto obrigatório na entrada.
 - Elevador: uso exclusivo para idosos e PCD.
