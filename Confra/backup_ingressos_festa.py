@@ -106,8 +106,9 @@ if lote_info:
 
 st.markdown("""
 **💰 VALORES**
+- Lote Mensalistas: Condição especial para mensalistas há 6 meses. Conforme regras divulgadas.
 - Lote Único: **R$ 130,00** (Dinheiro/Pix) ou no link de acordo com a quantidade.
-- Lote Porta: **A definir preço e quantidade conforme disponibilidade.
+- Lote Porta: A definir preço e quantidade conforme disponibilidade.
 
 **💳 FORMAS DE PAGAMENTO**
 - PIX com desconto: **(13)99133-7100**
