@@ -107,7 +107,7 @@ if lote_info:
 st.markdown("""
 **💰 VALORES**
 - Lote Único: **R$ 130,00** (Dinheiro/Pix) ou no link de acordo com a quantidade.
-- Lote Porta: **R$ 155,00** (Dinheiro/Pix) ou no link de acordo com a quantidade.
+- Lote Porta: **A definir preço e quantidade conforme disponibilidade.
 
 **💳 FORMAS DE PAGAMENTO**
 - PIX com desconto: **(13)99133-7100**
