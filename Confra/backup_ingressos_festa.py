@@ -84,18 +84,18 @@ quantidade = st.number_input(
 if LOTE_MANUAL == "UNICO":
     lote_atual = "Lote Geral"
     links_lote = {
-        1: ("https://pag.ae/81NJ3DfBa", "R$ 130,00 - R$ 135,41"),
-        2: ("https://pag.ae/81NJ3_6wa", "R$ 260,00 - R$ 270,82"),
-        3: ("https://pag.ae/81NJ4qHQv", "R$ 390,00 - R$ 406,23")
+        1: ("https://pag.ae/81NJ3DfBa", "R\$ 130,00 - R\$ 135,41"),
+        2: ("https://pag.ae/81NJ3_6wa", "R\$ 260,00 - R\$ 270,82"),
+        3: ("https://pag.ae/81NJ4qHQv", "R\$ 390,00 - R\$ 406,23")
     }
     link_pagamento, preco_lote = links_lote[quantidade]
     lote_info = f"Valor para {quantidade} ingresso(s): {preco_lote} no link."
 else:
     lote_atual = "Lote Porta"
     links_lote = {
-        1: ("https://pag.ae/81NJ4Xzb6", "R$ 155,00 - R$ 161,45"),
-        2: ("https://pag.ae/81NJ5qNKv", "R$ 310,00 - R$ 322,89"),
-        3: ("https://pag.ae/81NJ5JD2M", "R$ 465,00 - R$ 484,35")
+        1: ("https://pag.ae/81NJ4Xzb6", "R\$ 155,00 - R\$ 161,45"),
+        2: ("https://pag.ae/81NJ5qNKv", "R\$ 310,00 - R\$ 322,89"),
+        3: ("https://pag.ae/81NJ5JD2M", "R\$ 465,00 - R\$ 484,35")
     }
     link_pagamento, preco_lote = links_lote[quantidade]
     lote_info = f"Valor para {quantidade} ingresso(s): {preco_lote} no link."
