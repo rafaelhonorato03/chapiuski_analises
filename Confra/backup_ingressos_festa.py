@@ -84,18 +84,18 @@ quantidade = st.number_input(
 if LOTE_MANUAL == "UNICO":
     lote_atual = "Lote Geral"
     links_lote = {
-        1: ("https://pag.ae/81NJ3DfBa", "R\$ 130,00 - R\$ 135,41"),
-        2: ("https://pag.ae/81NJ3_6wa", "R\$ 260,00 - R\$ 270,82"),
-        3: ("https://pag.ae/81NJ4qHQv", "R\$ 390,00 - R\$ 406,23")
+        1: ("https://pag.ae/81NJ3DfBa", "R$ 130,00 - R$ 135,41"),
+        2: ("https://pag.ae/81NJ3_6wa", "R$ 260,00 - R$ 270,82"),
+        3: ("https://pag.ae/81NJ4qHQv", "R$ 390,00 - R$ 406,23")
     }
     link_pagamento, preco_lote = links_lote[quantidade]
     lote_info = f"Valor para {quantidade} ingresso(s): {preco_lote} no link."
 else:
     lote_atual = "Lote Porta"
     links_lote = {
-        1: ("https://pag.ae/81NJ4Xzb6", "R\$ 155,00 - R\$ 161,45"),
-        2: ("https://pag.ae/81NJ5qNKv", "R\$ 310,00 - R\$ 322,89"),
-        3: ("https://pag.ae/81NJ5JD2M", "R\$ 465,00 - R\$ 484,35")
+        1: ("https://pag.ae/81NJ4Xzb6", "R$ 155,00 - R$ 161,45"),
+        2: ("https://pag.ae/81NJ5qNKv", "R$ 310,00 - R$ 322,89"),
+        3: ("https://pag.ae/81NJ5JD2M", "R$ 465,00 - R$ 484,35")
     }
     link_pagamento, preco_lote = links_lote[quantidade]
     lote_info = f"Valor para {quantidade} ingresso(s): {preco_lote} no link."
@@ -105,14 +105,10 @@ if lote_info:
     st.info(lote_info)
 
 st.markdown("""
-**💰 VALORES**
+**💰 INFORMAÇÕES SOBRE OS LOTES**
 - Lote Mensalistas: Condição especial para mensalistas há 6 meses, conforme regras divulgadas.
-- Lote Único: **R$ 130,00** (Dinheiro/Pix) ou no link de acordo com a quantidade.
+- Lote Geral: **R$ 130,00** (Dinheiro/Pix) ou no link de acordo com a quantidade.
 - Lote Porta: A definir preço e quantidade conforme disponibilidade.
-
-**💳 FORMAS DE PAGAMENTO**
-- PIX com desconto: **(13)99133-7100**
-- Débito e Crédito: Link de pagamento gerado abaixo automaticamente após escolher a quantidade.
 
 **⚠️ REGRAS**
 - 👧👦 Crianças até 12 anos não pagam, mas é obrigatório enviar os dados da criança (nome completo e documento) para o WhatsApp (13)&nbsp;99133&#8209;7100 para liberação da entrada.
@@ -120,12 +116,33 @@ st.markdown("""
 - Documento com foto obrigatório na entrada.
 - Elevador: uso exclusivo para idosos e PCD.
 - Proibido drogas ilícitas e narguilé.
-- Preencha o site e envie o comprovante para validar sua compra.
+- Preencha o formulário abaixo e envie o comprovante para validar sua compra.
 
 ⚠️ Atenção: Compras realizadas não poderão ser canceladas nem reembolsadas.
 
 🎊 **Garanta já seu ingresso e venha comemorar o 9° ano do Chapiuski!** 🎊
+---
 """)
+
+# =========================================================================
+# === DINÂMICA DE PAGAMENTO ===
+# =========================================================================
+st.subheader("💳 Forma de Pagamento")
+forma_pagamento = st.radio(
+    "Como você prefere pagar?",
+    ["Pix", "Crédito", "Débito"],
+    horizontal=True
+)
+
+if forma_pagamento == "Pix":
+    st.success("**Chave PIX (Celular): (13)99133-7100**")
+    st.write("Após realizar a transferência, anexe o comprovante no formulário abaixo.")
+else:
+    st.info(f"Para pagamento via **{forma_pagamento}**, utilize o link abaixo:")
+    st.markdown(f"### 🔗 [Clique aqui para pagar seus {quantidade} ingresso(s)]({link_pagamento})")
+    st.write("Após concluir o pagamento, tire um print e anexe o comprovante no formulário abaixo.")
+
+st.markdown("---")
 
 if "botao_enviado" not in st.session_state:
     st.session_state.botao_enviado = False
@@ -144,9 +161,6 @@ with st.form("formulario_ingresso"):
             documento = st.text_input(f"Documento do participante #{i+1}", key=f"doc_{i}")
         nomes.append(nome)
         documentos.append(documento)
-    
-    if link_pagamento:
-        st.markdown(f"### 💳 [Clique aqui para pagar seus {quantidade} ingresso(s)]({link_pagamento})")
 
     comprovante = st.file_uploader(
         "Envie o comprovante de pagamento (imagem ou PDF)",
@@ -173,6 +187,7 @@ if enviado:
     else:
         try:
             datahora = datetime.now().isoformat()
+            # O dicionário 'data' volta ao original, sem a chave 'forma_pagamento'
             data = {
                 "email": email,
                 "quantidade": quantidade,
@@ -182,7 +197,7 @@ if enviado:
                 "lote": lote_atual
             }
             
-            # 1. Salva o novo registro no banco Supabase
+            # 1. Salva o novo registro no banco Supabase (exatamente como era antes)
             resposta = supabase.table("compra_ingressos").insert(data).execute()
 
             if resposta.data:
@@ -206,7 +221,7 @@ if enviado:
             # 3. GERAÇÃO DO CSV FILTRADO DIRETAMENTE DA MEMÓRIA
             csv_bytes = None
             try:
-                # Busca todos os dados ordenando por 'datahora' para garantir consistência nas posições das linhas
+                # Busca todos os dados ordenando por 'datahora'
                 response_db = supabase.table("compra_ingressos").select("*").order("datahora", desc=False).execute()
                 if response_db.data:
                     df_completo = pd.DataFrame(response_db.data)
@@ -214,7 +229,7 @@ if enviado:
                     # .iloc[282:] corta da linha 283 em diante (Python começa no índice 0)
                     df_filtrado = df_completo[df_completo['id'] >= 283]
                     
-                    # Filtra APENAS as colunas solicitadas
+                    # Filtra APENAS as colunas solicitadas originais (sem forma_pagamento)
                     colunas_desejadas = ["id", "datahora", "email", "quantidade", "nomes", "documentos", "lote"]
                     
                     # O .filter() ignora colunas que porventura não existam para evitar que o código quebre
@@ -227,31 +242,64 @@ if enviado:
             except Exception as e:
                 st.error(f"Erro ao processar dados para o anexo CSV: {e}")
 
-            # 4. Corpo do e-mail textualmente
+            # 4. Corpo do e-mail textualmente (mantive a informação da forma de pagamento apenas aqui)
             corpo = f"""
 Novo pedido de ingresso ({lote_atual}):
 
 E-mail do responsável: {email}
 Quantidade de ingressos: {quantidade}
+Forma de Pagamento informada: {forma_pagamento}
 Data/Hora do pedido: {datahora}
 
 Participantes:
 """ + "\n".join([f"{i+1}. Nome: {nomes[i]}, Documento: {documentos[i]}" for i in range(quantidade)])
 
-            # 5. Envia o e-mail passando os bytes do CSV virtual
+            # 5. Envia o e-mail para a ORGANIZAÇÃO (com CSV e comprovante)
             try:
                 enviar_email(
                     remetente,
                     senha,
-                    lista_destinatarios,
+                    lista_destinatarios, # Vai para a organização
                     f"Novo pedido de ingresso - {lote_atual}",
                     corpo,
                     comprovante,
                     csv_bytes
                 )
                 st.success("Dados enviados por e-mail para a organização!")
+                
+                # =========================================================
+                # 6. Dispara e-mail de confirmação EXCLUSIVO para o COMPRADOR
+                # =========================================================
+                corpo_comprador = f"""Olá!
+
+Recebemos o seu pedido de reserva de ingresso(s) para a Festa Chapiuski 2026.
+
+📋 Resumo do seu pedido:
+- Quantidade: {quantidade} ingresso(s)
+- Participantes: {', '.join(nomes)}
+- Forma de pagamento escolhida: {forma_pagamento}
+
+Seu comprovante foi recebido e está em análise pela nossa equipe. 
+Aguarde, em breve sua entrada estará garantida!
+
+Obrigado,
+Organização Festa Chapiuski
+"""
+                # Dispara usando a mesma função, mas apenas para o [email] digitado 
+                # e passando "None" para o CSV (para não vazar dados).
+                enviar_email(
+                    remetente,
+                    senha,
+                    [email.strip()], # O e-mail do comprador como uma lista
+                    "Confirmação de Pedido - Festa Chapiuski",
+                    corpo_comprador,
+                    None, # Deixamos None para não reenviar o comprovante (opcional)
+                    None  # NENHUM CSV AQUI! Segurança dos dados.
+                )
+                st.success(f"Um e-mail de confirmação foi enviado para {email}!")
+
             except Exception as e:
-                st.error(f"Erro ao enviar e-mail: {e}")
+                st.error(f"Erro ao enviar e-mails: {e}")
 
         except Exception as e:
             st.error(f"Erro geral no processamento: {e}")
