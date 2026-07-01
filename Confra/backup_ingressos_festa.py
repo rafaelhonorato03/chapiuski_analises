@@ -61,7 +61,7 @@ def enviar_email(remetente, senha, destinatarios, assunto, corpo, comprovante, c
 # =========================================================================
 # === CONTROLE MANUAL DE LOTES E LINKS (VIRE AQUI QUANDO PRECISAR) ========
 # =========================================================================
-LOTE_MANUAL = "UNICO"  # Opções: "UNICO" ou "PORTA"
+LOTE_MANUAL = "PORTA"  # Opções: "UNICO" ou "PORTA"
 # =========================================================================
 
 MAX_INGRESSOS = 3 
