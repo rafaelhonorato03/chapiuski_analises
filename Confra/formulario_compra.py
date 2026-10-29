@@ -131,6 +131,10 @@ def agora_brasilia():
 
 
 def lote_vigente(agora):
+    # Antes do início do Lote 1 as vendas já funcionam (o link só é divulgado na data certa):
+    # vale o preço do Lote 1.
+    if agora < LOTES[0]["inicio"]:
+        return LOTES[0]
     for lote in LOTES:
         if lote["inicio"] <= agora < lote["fim"]:
             return lote
@@ -232,12 +236,6 @@ st.warning(
 )
 
 # ==================== VENDAS ABERTAS? ====================
-if agora < LOTES[0]["inicio"]:
-    st.warning(
-        f"⏳ As vendas começam em {LOTES[0]['inicio']:%d/%m/%Y} às {LOTES[0]['inicio']:%Hh%M}."
-    )
-    st.stop()
-
 if lote is None:
     st.warning("🚫 As vendas foram encerradas. Em caso de dúvidas, fale com a organização.")
     st.stop()
