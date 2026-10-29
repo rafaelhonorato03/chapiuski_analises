@@ -13,6 +13,7 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from html import escape
+from urllib.parse import urlparse
 
 import pandas as pd
 import streamlit as st
@@ -49,7 +50,20 @@ def config(nome):
         return None
 
 
-SUPABASE_URL = config("SUPABASE_URL")
+def normalizar_url_supabase(url):
+    """Devolve só https://<projeto>.supabase.co.
+    Descarta barra no fim e caminhos colados por engano (ex.: /rest/v1/), que causam o erro
+    PGRST125 'Invalid path specified in request URL'."""
+    if not url:
+        return url
+    url = url.strip()
+    if "://" not in url:
+        url = "https://" + url
+    partes = urlparse(url)
+    return f"{partes.scheme}://{partes.netloc}"
+
+
+SUPABASE_URL = normalizar_url_supabase(config("SUPABASE_URL"))
 SUPABASE_KEY = config("SUPABASE_KEY")
 EMAIL_REMETENTE = config("EMAIL_REMETENTE")
 EMAIL_SENHA = config("EMAIL_SENHA")
@@ -219,16 +233,18 @@ st.markdown("""
 agora = agora_brasilia()
 lote = lote_vigente(agora)
 
-tabela_lotes = "| Lote | Período | PIX (por ingresso) | Crédito em até 10x (por ingresso) |\n| :--- | :--- | :--- | :--- |\n"
-for _l in LOTES:
-    _marca = " ✅ (vigente)" if lote is not None and _l["nome"] == lote["nome"] else ""
-    tabela_lotes += (
-        f"| **{_l['nome']}**{_marca} | {_l['periodo']} | {brl(_l['pix_unit'])} | {brl(_l['credito_unit'])} |\n"
+# Mostra só o valor do lote vigente: os valores dos outros lotes são informação interna.
+if lote is not None:
+    st.markdown("### Valores")
+    st.markdown(
+        "| Ingresso | PIX | Crédito em até 10x |\n"
+        "| :--- | :--- | :--- |\n"
+        f"| **{lote['nome']}** ({lote['periodo']}) | {brl(lote['pix_unit'])} | {brl(lote['credito_unit'])} |"
     )
-
-st.markdown("### Valores")
-st.markdown(tabela_lotes)
-st.caption("Após o fim do Lote 1 há reajuste no preço (conforme disponibilidade).")
+    st.caption("Valores por ingresso.")
+    if lote is LOTES[0]:
+        # Aviso público dos flyers (sem citar valores)
+        st.caption("Após o término das vendas deste lote haverá reajuste no preço (conforme disponibilidade).")
 
 st.warning(
     "**Crianças de até 12 anos não pagam**, mas é obrigatório preencher o nome completo e o "
