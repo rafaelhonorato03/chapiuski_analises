@@ -217,14 +217,13 @@ st.divider()
 
 st.info(
     "**📅 Data:** Sábado, 05/12/2026 | **⏰ Festa:** 16h às 22h\n\n"
-    "**📍 Local:** Penha Society - Penha, SP"
+    "**📍 Local:** Penha Society - R. Alvinópolis, 453 - Vila Beatriz, São Paulo - SP Ao lado do Metrô Penha, SP"
 )
 
 st.markdown("""
 ### O que esperar
 - **Futebol:** 14h às 16h
 - **Premiação:** após o futebol
-- **Festa:** 16h às 22h
 - **Open Food:** equipe Alô Garçom
 - **Bebidas:** vendas no bar do Fausto
 - **Pagode ao vivo:** A partir das 19h
