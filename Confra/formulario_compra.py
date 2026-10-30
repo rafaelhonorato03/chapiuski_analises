@@ -224,10 +224,10 @@ st.markdown("""
 ### O que esperar
 - **Futebol:** 14h às 16h
 - **Premiação:** após o futebol
-- **A festa:** 16h às 22h
+- **Festa:** 16h às 22h
 - **Open Food:** equipe Alô Garçom
 - **Bebidas:** vendas no bar do Fausto
-- **Pagode ao vivo:** 18h30 às 22h
+- **Pagode ao vivo:** A partir das 19h
 """)
 
 agora = agora_brasilia()
@@ -235,9 +235,9 @@ lote = lote_vigente(agora)
 
 # Mostra só o valor do lote vigente: os valores dos outros lotes são informação interna.
 if lote is not None:
-    st.markdown("### Valores")
+    st.markdown("### Formas de pagamento")
     st.markdown(
-        "| Ingresso | PIX | Crédito em até 10x |\n"
+        "| Ingresso | PIX | Créd c/ taxa |\n"
         "| :--- | :--- | :--- |\n"
         f"| **{lote['nome']}** ({lote['periodo']}) | {brl(lote['pix_unit'])} | {brl(lote['credito_unit'])} |"
     )
@@ -364,13 +364,13 @@ with st.form("finalizar_compra_form"):
     st.markdown(f"#### Pagamento - {lote['nome']}")
 
     with st.expander("Opção 1: PIX (melhor preço)", expanded=True):
-        st.markdown(f"### Valor total (PIX): **{brl(preco_pix)}**")
+        st.markdown(f"### Valor (PIX): **{brl(preco_pix)}**")
         st.markdown(f"Favorecido: **{PIX_FAVORECIDO}**")
         st.markdown("Chave PIX (telefone):")
         st.code(PIX_CHAVE)
 
     with st.expander("Opção 2: Cartão de crédito em até 10x (link, com taxa)"):
-        st.markdown(f"### Valor total (crédito): **{brl(preco_credito)}**")
+        st.markdown(f"### Valor (crédito): **{brl(preco_credito)}**")
         st.markdown(f"🔗 [**CLIQUE AQUI PARA ACESSAR O LINK DE PAGAMENTO**]({link_pagamento})")
         st.info("Este link vale para a sua quantidade de ingressos neste lote.")
 
@@ -534,7 +534,7 @@ O comprovante está em anexo. Confira o pagamento para validar o pedido.
   <h3>Participantes (levar documento com foto)</h3>
   <ul>{itens_html}</ul>
   <p><b>Sábado, 05/12/2026 - Penha Society (Penha, SP)</b><br>
-     Futebol 14h às 16h | Festa 16h às 22h | Pagode ao vivo 18h30 às 22h</p>
+     Futebol 14h às 16h | Festa 16h às 22h | Pagode ao vivo a partir das 19h</p>
   <hr>
   <p>Obrigado! <b>#ConfraChapiuski2026</b></p>
 </body>
